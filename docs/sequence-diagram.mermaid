@@ -1,0 +1,56 @@
+sequenceDiagram
+    actor User
+    participant UI as Sidebar/UI
+    participant Store as useTabsStore/useUIStore
+    participant Cmd as fsCommands
+    participant Rust as Rust backend
+    participant FS as File System
+    participant MD as markdown+highlight
+    participant Edit as EditorPane(textarea)
+    participant Preview as PreviewPane
+
+    Note over User,Rust: 1) 打开文件夹
+    User->>UI: 点击 "Open Folder"
+    UI->>Cmd: openFolderDialog()
+    Cmd->>Rust: dialog.open({directory:true})
+    Rust->>User: 选择文件夹
+    Rust-->>Cmd: folderPath
+    Cmd->>Rust: invoke('build_tree',{path:folderPath})
+    Rust->>FS: std::fs::read_dir 递归
+    FS-->>Rust: 条目列表
+    Rust-->>Cmd: FileNode[] (仅 .md + 含 md 目录)
+    Cmd->>Store: useUIStore.setFolder(folderPath, tree)
+    UI->>Store: 订阅并渲染 FileTree
+
+    Note over User,Rust: 2) 打开文件（点击树节点）
+    User->>UI: 点击 .md 文件
+    UI->>Cmd: readFileText(path)
+    Cmd->>Rust: fs.readTextFile(path)
+    Rust->>FS: 读文本
+    FS-->>Rust: content
+    Rust-->>Cmd: content
+    Cmd->>Store: useTabsStore.openTab({path,name,content})
+    Store->>UI: 新增/激活 Tab
+
+    Note over User,Rust: 3) 编辑（实时）
+    User->>Edit: 输入文本
+    Edit->>Store: updateContent(activeId, value)
+    Store->>Store: dirty = content!==savedContent
+    Edit->>MD: render(value)
+    MD->>Preview: HTML + hljs 高亮
+    Preview-->>UI: 渲染预览（split/preview 视图）
+
+    Note over User,Rust: 4) 切换视图
+    User->>UI: 点击 编辑/分屏/预览
+    UI->>Store: useUIStore.setViewMode(mode)
+    UI->>UI: 重排 EditorPane / PreviewPane
+
+    Note over User,Rust: 5) 保存 (Ctrl+S)
+    User->>UI: Ctrl+S
+    UI->>Store: useTabsStore.saveActive()
+    Store->>Cmd: writeFileText(path, content)
+    Cmd->>Rust: fs.writeTextFile(path, content)
+    Rust->>FS: 写回原文件
+    Rust-->>Cmd: ok
+    Cmd->>Store: savedContent=content; dirty=false
+    UI->>UI: 清除标签脏标记 / 状态栏更新

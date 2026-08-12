@@ -1,0 +1,12 @@
+{
+  "name": "pm-spike",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "start": "node fidelity.mjs"
+  },
+  "dependencies": {
+    "prosemirror-markdown": "^1.13.5"
+  }
+}

@@ -1,0 +1,216 @@
+classDiagram
+    direction LR
+
+    class ViewMode {
+        <<enum>>
+        edit
+        live
+        preview
+    }
+    class WorkspaceLayout {
+        <<enum>>
+        single
+        split
+    }
+    class ThemePreference {
+        <<enum>>
+        light
+        dark
+        auto
+    }
+    class ResolvedTheme {
+        <<enum>>
+        light
+        dark
+    }
+
+    class Cursor {
+        +number line
+        +number col
+    }
+
+    class Pane {
+        +PaneId id
+        +string tabId
+        +ViewMode viewMode
+        +Cursor cursor
+        +number scrollTop
+    }
+
+    class EditorTab {
+        +string id
+        +string path
+        +string name
+        +string content
+        +string savedContent
+        +boolean dirty
+        +Cursor cursor_deprecated
+    }
+
+    class AppConfig {
+        +number configVersion
+        +ThemePreference theme
+        +ViewMode defaultView
+        +WorkspaceLayout workspaceLayout
+        +number splitRatio
+        +ViewMode[] paneViewModes
+        +string fontFamily
+        +number fontSize
+        +boolean autoSave
+    }
+
+    class usePanesStore {
+        -WorkspaceLayout layout
+        -Pane[] panes
+        -PaneId focusedPaneId
+        -number splitRatio
+        +getFocusedPane() Pane
+        +getFocusedTabId() string
+        +setLayout(l) void
+        +setFocusedPane(id) void
+        +setPaneTab(id, tabId) void
+        +setPaneViewMode(id, m) void
+        +setPaneCursor(id, c) void
+        +setSplitRatio(r) void
+        +hydrate(cfg, tabId) void
+    }
+
+    class useTabsStore {
+        -EditorTab[] tabs
+        -string activeId
+        +openTab(file) void
+        +closeTab(id) void
+        +updateContent(id, value) void
+        +saveActive() void
+    }
+
+    class useUIStore {
+        -ResolvedTheme resolvedTheme
+        -boolean sidebarVisible
+        -FileNode[] tree
+        +setResolvedTheme(t) void
+    }
+
+    class useConfigStore {
+        -AppConfig config
+        +load() void
+        +update(patch) void
+    }
+
+    class paneRouter {
+        <<module>>
+        +openInFocusedPane(file) void
+        +focusPane(paneId) void
+        +splitToggle() void
+        +closePane(paneId) void
+        +detachTab(tabId) void
+    }
+
+    class EditorHandle {
+        <<interface>>
+        +string paneId
+        +string tabId
+        +getValue() string
+        +getSelection() Range
+        +setSelection(s, e) void
+        +replaceRange(f, t, ins, sel) void
+        +getCursor() Cursor
+        +focus() void
+        +scrollToOffset(o) void
+    }
+
+    class editorRegistry {
+        <<module>>
+        -Map~string,EditorHandle~ handles
+        +registerEditor(paneId, h) void
+        +unregisterEditor(paneId) void
+        +getEditor(paneId) EditorHandle
+        +getFocusedEditor() EditorHandle
+    }
+
+    class CodeEditor {
+        -EditorView view
+        -Compartment themeCompartment
+        -Compartment fontCompartment
+        -Compartment liveCompartment
+        +mount() void
+        +applyViewMode(m) void
+    }
+
+    class livePreviewPlugin {
+        <<ViewPlugin>>
+        -DecorationSet deco
+        -boolean frozen
+        +build(view) DecorationSet
+        +update(u) void
+        +activeLineNumbers(state) Set
+    }
+
+    class markdownDecor {
+        <<module>>
+        +HIDE_MARKS Map
+        +LINE_CLASS Map
+        +INLINE_CLASS Map
+        +BulletWidget
+        +CheckboxWidget
+    }
+
+    class themeLib {
+        <<module>>
+        +getSystemTheme() ResolvedTheme
+        +resolveTheme(pref) ResolvedTheme
+        +applyTheme(t) void
+        +watchSystemTheme(cb) Function
+    }
+
+    class textDiff {
+        <<module>>
+        +minimalChange(old, new) Change
+    }
+
+    class useDocSync {
+        <<hook>>
+        +syncToStore() void
+        +syncToPeers(changes) void
+        +syncFromStore() void
+    }
+
+    class markdownLib {
+        <<module>>
+        +render(md) string
+    }
+
+    class PreviewPane {
+        +string tabId
+    }
+
+    Pane "1" *-- "1" Cursor : owns
+    Pane "0..1" --> "1" EditorTab : referencesByTabId
+    usePanesStore "1" *-- "1..2" Pane : manages
+    useTabsStore "1" *-- "*" EditorTab : manages
+    useConfigStore "1" *-- "1" AppConfig : holds
+    AppConfig ..> ViewMode : defaultView / paneViewModes
+    AppConfig ..> WorkspaceLayout : workspaceLayout
+    AppConfig ..> ThemePreference : theme
+    Pane ..> ViewMode : viewMode
+    usePanesStore ..> WorkspaceLayout : layout
+
+    paneRouter ..> usePanesStore : mutates
+    paneRouter ..> useTabsStore : mutates
+    paneRouter ..> useConfigStore : persists
+
+    CodeEditor ..|> EditorHandle : implements
+    PreviewPane ..> EditorTab : readsContent
+    editorRegistry o-- EditorHandle : registry
+    editorRegistry ..> usePanesStore : resolvesFocusedPane
+    CodeEditor ..> editorRegistry : registersSelf
+    CodeEditor ..> useDocSync : uses
+    CodeEditor *-- livePreviewPlugin : extension
+    CodeEditor ..> useUIStore : readsResolvedTheme
+    CodeEditor ..> useConfigStore : readsFontConfig
+    livePreviewPlugin ..> markdownDecor : decorationTable
+    livePreviewPlugin ..> markdownLib : P1_blockWidgetOnly
+    useDocSync ..> textDiff : minimalChange
+    useDocSync ..> useTabsStore : updateContent
+    useDocSync ..> editorRegistry : findPeerViews
+    themeLib ..> useUIStore : setResolvedTheme

@@ -1,0 +1,206 @@
+%% ============================================================
+%% PureMark iter2-ext — 增量时序图
+%% ① 启动序列（窗口几何 restore + 文件关联收侧栏 + TOC UI 推导 + 右键守卫）
+%% ============================================================
+sequenceDiagram
+    participant APP as App.tsx
+    participant CS as useConfigStore
+    participant UIS as useUIStore
+    participant TR as lib/tocRouter
+    participant PS as usePanesStore
+    participant TA as lib/tauri
+    participant WG as lib/windowGeometry
+    participant MON as Monitor / workArea
+    participant WIN as Tauri Window
+    participant RS as take_launch_file
+    participant CM as lib/contextMenu
+
+    Note over APP,RS: 【单一串行启动序列 —— 修复 iter2 两个 effect 无顺序保证的竞态】
+    APP->>CS: await loadConfig()
+    CS->>CS: migrateConfig(raw) v2 -> v3
+    Note over CS: accent 缺失 -> 'sky'（老用户保持原青色）<br/>tocVisible -> false / tocPosition -> 'right' / tocWidth -> 220<br/>configVersion = 3；任何异常值回落默认且不阻断
+    APP->>UIS: setSidebarVisible(cfg.sidebarVisible)
+    APP->>UIS: setSidebarWidth(cfg.sidebarWidth)
+    APP->>TR: hydrateTocUi(cfg)
+    TR->>UIS: setSidebarMode(deriveSidebarMode(tocVisible, tocPosition))
+    Note over TR,UIS: tocVisible && tocPosition==='left' ? 'toc' : 'files'
+    APP->>PS: hydrate(cfg, useTabsStore.activeId)
+
+    rect rgb(240,246,255)
+    Note over APP,WIN: 【窗口几何：单次原子应用，禁止二次 setSize】
+    APP->>TA: await applyStartupGeometry()
+    TA->>TA: storeGet('window-state')
+    TA->>MON: currentMonitor() ?? primaryMonitor()
+    MON-->>TA: workArea(physical) + scaleFactor
+    TA->>TA: work = { w: area.w / sf, h: area.h / sf }   逻辑像素
+    TA->>WG: computeStartupGeometry(remembered, work)
+    WG->>WG: isValidGeometry? schema===2 && unit==='logical'
+    alt 无标记 / 非对象 / 尺寸 > workArea*1.5（历史脏数据）
+        WG-->>TA: { 1400x900 后 clamp, source:'default' }
+    else 记录有效
+        WG->>WG: w = clamp(rememberedW, MIN.w, work.w - 32)
+        WG->>WG: h = clamp(rememberedH, MIN.h, work.h - 32)
+        WG->>WG: 小屏兜底：work - 32 < MIN 时允许突破 MIN
+        WG-->>TA: { w, h, maximize, source }
+    end
+    TA->>WIN: setSize(new LogicalSize(w, h))
+    Note over TA,WIN: 仅此一次 setSize；单位与持久化一致（修复 RC-1）
+    TA->>WIN: center()
+    Note over WIN: P0 不记忆位置（位置入 P1 / N-23）
+    opt source === 'maximized'
+        TA->>WIN: maximize()
+    end
+    TA->>TA: clampedAtStartup = (source === 'clamped'); startupSize = {w,h}
+    TA->>TA: geometryReady = true
+    end
+
+    APP->>TA: listenWindowResize(debounce 500ms -> persistWindowState)
+    Note over TA: persistWindowState() 首行 if (!geometryReady) return;<br/>启动阶段的自动调整不写回存储（修复 RC-2）<br/>写入时 (await innerSize()).toLogical(sf) + { schema:2, unit:'logical' }
+
+    APP->>RS: await invoke('take_launch_file')
+    alt 返回非空（双击 .md / Open with 启动）
+        APP->>UIS: setSidebarVisible(false)
+        Note over APP,UIS: 仅本次会话，不写 config（N-06）<br/>下次正常启动仍按用户偏好显示
+        APP->>APP: await openPath(pending) -> openInFocusedPane(file)
+    else 返回 null（正常启动）
+        Note over APP: 侧栏保持 config 恢复的状态
+    end
+
+    APP->>CM: installContextMenuGuard({ enabled: !import.meta.env.DEV })
+    CM->>CM: window.addEventListener('contextmenu', preventDefault, { capture:true })
+    Note over CM: capture 阶段先于任何元素处理器触发<br/>自动覆盖 .cm-content / 预览区 / 输入框 / 弹层<br/>App 卸载时 removeEventListener（防 HMR 泄漏）
+
+    Note over APP,RS: 运行时 open-file 事件保留在独立 effect —— 不收侧栏（PM 待确认 #8 已定）
+
+
+%% ============================================================
+%% ② 主题 + 主题色应用（N-01 / N-02）
+%% ============================================================
+sequenceDiagram
+    actor U as 用户
+    actor OS as Windows 系统
+    participant SP as SettingsPanel
+    participant CS as useConfigStore
+    participant TH as hooks/useTheme
+    participant TL as lib/theme
+    participant DOM as html 元素
+    participant UIS as useUIStore
+    participant CE as CodeEditor (CM6)
+
+    Note over U,CE: 【a】启动 / 任一依赖变化（effect 依赖 = [theme, accent, accentCustom]）
+    TH->>TL: resolveTheme(preference) -> t
+    TH->>TL: applyTheme(t)
+    TL->>DOM: documentElement.dataset.theme = t
+    Note over TL,DOM: iter2 §8.3 不变：applyTheme 仍是唯一写 data-theme 的函数
+    TH->>TL: applyAccent(accent, accentCustom, t)
+    TL->>TL: deriveAccentVars(primary, hover, t)  【纯函数】
+    Note over TL: --primary = primary<br/>--primary-hover = hover ?? shiftLightness(±10%)<br/>--primary-soft = rgba(r,g,b, t==='dark' ? 0.18 : 0.10)<br/>--ring = rgba(r,g,b, 0.35)<br/>--primary-foreground = L(primary) > 0.6 ? '#1f2328' : '#ffffff'
+    TL->>DOM: documentElement.style.setProperty(x5)
+    Note over DOM: 内联样式优先级 > :root 与 [data-theme="dark"]<br/>一次写入同时覆盖明暗两态<br/>@theme inline 自动传导到全部 Tailwind 工具类
+    TH->>UIS: setResolvedTheme(t)
+    UIS-->>CE: darkCompartment.reconfigure(EditorView.darkTheme.of(t==='dark'))
+
+    Note over U,CE: 【b】用户在设置面板点「紫」色点
+    U->>SP: click accent swatch (purple)
+    SP->>CS: update({ accent: 'purple' })
+    CS-->>TH: config.accent 变化 -> effect 重跑
+    TH->>TL: commit(t) = applyTheme(t) + applyAccent('purple', null, t)
+    Note over DOM: 分段控件激活态 / 侧栏激活文件项 / 焦点环 / 引用左边条<br/>/ CM6 选区背景 全部即时变紫，无需重启
+
+    Note over U,CE: 【c】theme='auto' 且 OS 切到深色 —— --primary-soft 必须重算
+    OS->>TH: watchSystemTheme 回调 cb('dark')
+    TH->>TL: applyTheme('dark')
+    TH->>TL: applyAccent(accent, custom, 'dark')
+    Note over TL: 主色不变；alpha 0.10 -> 0.18 自动重算<br/>因为 applyAccent 与 applyTheme 在同一次 commit(t) 内，t 即为目标主题，零竞态
+
+    Note over U,CE: 【d】非法 hex / 异常
+    TL->>TL: hexToRgb 返回 null -> 回落 ACCENT_PRESETS.sky，try/catch 兜底
+    Note over TL: 绝不抛错阻断渲染
+
+
+%% ============================================================
+%% ③ TOC：开关 -> 解析 -> 跳转 -> 焦点跟随（N-07 ~ N-16）
+%% ============================================================
+sequenceDiagram
+    actor U as 用户
+    participant TB as Toolbar
+    participant SB as Sidebar
+    participant TR as lib/tocRouter
+    participant CS as useConfigStore
+    participant UIS as useUIStore
+    participant HK as hooks/useToc
+    participant PS as usePanesStore
+    participant TS as useTabsStore
+    participant TC as lib/toc
+    participant TL as TocList
+    participant REG as lib/tocRegistry
+    participant CE as CodeEditor (live/edit)
+    participant PV as PreviewPane (preview)
+
+    Note over U,PV: 【a】开关目录（唯一入口 tocRouter，边界规则集中实现）
+    U->>TB: 点击「目录」按钮 (ListTree)
+    TB->>TR: toggleToc()
+    TR->>CS: update({ tocVisible: true })
+    alt tocPosition === 'left'
+        TR->>UIS: setSidebarMode('toc')
+        opt sidebarVisible === false
+            TR->>UIS: setSidebarVisible(true)
+            TR->>CS: update({ sidebarVisible: true })
+            Note over TR: 否则用户点了开关看不到任何反馈
+        end
+    else tocPosition === 'right'
+        Note over TR: EditorCard 内 .editor-pane 并列渲染 TocPanel<br/>width: clamp(180px, var(--layout-toc), 24%)
+    end
+
+    Note over U,PV: 【b】切换位置 left -> right
+    U->>TB: 点击「位置」按钮
+    TB->>TR: toggleTocPosition()
+    TR->>CS: update({ tocPosition: 'right' })
+    TR->>UIS: setSidebarMode('files')
+    Note over SB: 切换按钮消失，「隐藏侧边栏」按钮回归
+
+    Note over U,PV: 【c】左侧模式下的形态切换
+    U->>SB: 点击侧栏头部 ⇄ 按钮
+    SB->>TR: setSidebarMode('files' | 'toc')
+    Note over SB: OUTLINE ⇄ EXPLORER 文案切换<br/>OpenFolderButton 仅 files 形态显示<br/>收起侧栏沿用 Toolbar 最左 PanelLeftClose 按钮（N-11 零改动）
+
+    Note over U,PV: 【d】解析（跟随焦点窗格 + 200ms 去抖）
+    HK->>PS: focusedPaneId -> getFocusedPane()
+    PS-->>HK: { id:'A', tabId:'X', viewMode:'live' }
+    HK->>TS: tabs.find(X).content
+    alt tabId / paneId 变化
+        HK->>HK: 立即同步，不去抖
+        Note over HK: 否则切文件后目录会滞后 200ms 显示旧大纲
+    else 仅内容变化（打字）
+        HK->>HK: setTimeout(200ms) 去抖
+    end
+    HK->>TC: useMemo(parseToc(content))
+    TC->>TC: 逐行状态机：``` / ~~~ 围栏内的 # 一律跳过
+    TC->>TC: ATX /^ {0,3}(#{1,6})(\s+|$)/；去尾部闭合 #；清洗行内标记
+    TC-->>HK: TocItem[] { id, level, text, line(1-based), index(0-based) }
+    HK-->>TL: items（空则渲染「本文档暂无标题」/「未打开文档」）
+
+    Note over U,PV: 【e】点击目录项跳转
+    U->>TL: 点击「第二章 快捷键」(line=42, index=3)
+    TL->>TR: revealHeadingInFocusedPane(item)
+    TR->>PS: getFocusedPane() -> paneId
+    TR->>REG: getTocTarget(paneId)
+    alt 焦点窗格 = live / edit（CM6）
+        REG-->>CE: revealHeading({ line: 42 })
+        CE->>CE: n = min(42, view.state.doc.lines)   越界钳制
+        CE->>CE: dispatch({ effects: EditorView.scrollIntoView(doc.line(n).from, { y:'start', yMargin:12 }), annotations: syncAnnotation.of(true) })
+        Note over CE: ① 必带 syncAnnotation（iter2 §8.1 规约）<br/>② 不 setSelection、不 focus()<br/>-> 目标标题行保持定格渲染态，不还原为源码
+    else 焦点窗格 = preview（DOM）
+        REG-->>PV: revealHeading({ index: 3 })
+        PV->>PV: container.querySelectorAll('h1,h2,h3,h4,h5,h6')[3]?.scrollIntoView({ block:'start' })
+        Note over PV: parseToc 与 marked 都跳过围栏代码块<br/>-> h 标签序列与 TocItem.index 天然对齐（对拍测试锁定）
+    else 无文档 / 未注册
+        REG-->>TR: null -> 静默 return（目录项已置灰不可点）
+    end
+
+    Note over U,PV: 【f】分屏下切换焦点窗格，目录同步（N-13）
+    U->>PV: 点击 Pane B（preview 区域）
+    PV->>PS: focusPane('B')
+    Note over PV: 本轮新增 —— iter2 的 PreviewPane 没有 paneId，<br/>点击预览窗格根本不会切焦点（B-4 修复）
+    PS-->>HK: focusedPaneId 变化 -> 读 B 的 tabId -> 立即重算目录
+    HK-->>TL: 目录切换为 B 窗格文档的大纲

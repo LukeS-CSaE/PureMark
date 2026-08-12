@@ -1,0 +1,59 @@
+# ========== Dependencies ==========
+node_modules/
+.pnpm-store/
+
+# ========== Build output ==========
+dist/
+src-tauri/target/
+src-tauri/gen/
+
+# ========== Logs ==========
+*.log
+
+# ========== OS / Editor ==========
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# ========== Agent / tooling memory (local only) ==========
+.workbuddy/
+
+# ========== Scratch / debug files (underscore-prefixed) ==========
+_*
+.tmp/
+
+# ========== QA / harness temporary artifacts ==========
+.qa_tmp/
+.trash-iter2/
+qa_*.log
+qa_*.full*
+vitest.config.ts.timestamp-*.mjs
+vitest*.out.txt
+tsc*.txt
+tsc*.log
+tsc*.out.txt
+*_summary.txt
+baseline*.json
+baseline*.txt
+final.json
+final_summary.txt
+failures.txt
+run1*.json
+run1*.txt
+solo*.json
+solo*.txt
+report.json
+summary.txt
+summarize.cjs
+t01_*.cjs
+t01_*.mjs
+extract_failures.cjs
+debug-*
+probe-live.js
+shot-*.png
+g_*.txt
+sizes.txt
+
+# ========== Lockfiles: pnpm is the canonical package manager ==========
+package-lock.json

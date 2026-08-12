@@ -1,0 +1,335 @@
+/* ============================================================
+ * 行级实时渲染 (live preview rewrite, line-decoration 方案).
+ *
+ * 旧版 widget-replacement 方案拥有大量旧 widget 容器样式, 行级
+ * 重写为 line-decoration 后这些规则全部删除. 编辑态的块级字号 / 字重 /
+ * 缩进 / 引用线由 .cm-md-block-* 类驱动, 语法标记 (# ** > 等)
+ * 始终可见, 由 .cm-tok-md-* 类淡显.
+ *
+ * 关键约定:
+ *   - 光标始终在可编辑文本内, 编辑已渲染文本时字号自动保持 (用户核心
+ *     需求) — 由 .cm-md-block-* 类的 font-size / font-weight 落到
+ *     .cm-line 上, 编辑新输入的字符继承当前行字号.
+ *   - LineDecoration 只设置 class, 不改文本内容, 因此无 widget / click
+ *     坐标错位 bug, 也无需 .cm-live 自愈补丁.
+ *   - .cm-live 仍作为 live 模式的根标记, 驱动字号基础值 (与 preview
+ *     同步的 14px).
+ *
+ * 取舍: 多行结构 (列表 / 引用 / 段落软换行) 按行独立装饰, 无跨行
+ * <ul> / <blockquote> 容器 — 这是 "行级渲染" 的固有代价.
+ * ============================================================ */
+
+/* ---- Host element ---------------------------------------------------- */
+
+.code-editor {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.code-editor > .cm-editor {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+}
+
+/* ---- Editor chrome --------------------------------------------------- */
+
+.cm-editor {
+  background: transparent;
+  color: var(--foreground);
+  height: 100%;
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+.cm-editor .cm-scroller {
+  line-height: var(--editor-line-height);
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.cm-editor .cm-scroller::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.cm-editor .cm-scroller::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+.cm-editor .cm-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cm-editor .cm-content {
+  caret-color: var(--foreground);
+  tab-size: 2;
+}
+
+.cm-editor .cm-line {
+  padding: 0;
+}
+
+/* Caret + selection follow the theme tokens, so data-theme is enough. */
+.cm-editor .cm-cursor,
+.cm-editor .cm-dropCursor {
+  border-left-color: var(--foreground);
+  border-left-width: 2px;
+}
+
+.cm-editor .cm-selectionLayer .cm-selectionBackground,
+.cm-editor.cm-focused .cm-selectionLayer .cm-selectionBackground {
+  background: var(--primary-soft);
+}
+
+.cm-editor .cm-content ::selection,
+.cm-editor .cm-line ::selection {
+  background: var(--primary-soft);
+}
+
+.cm-editor .cm-specialChar {
+  color: var(--foreground-subtle);
+}
+
+.cm-editor .cm-placeholder {
+  color: var(--foreground-subtle);
+}
+
+/* ---- Syntax token colours (class-based HighlightStyle, see cmTheme.ts) --
+ * edit 模式以及 live 模式下的"当前源码行"共用这些 token, 颜色取自
+ * --hl-* 调色板, light/dark 切换零成本.
+ * ---------------------------------------------------------------------- */
+
+.cm-tok-comment {
+  color: var(--hl-comment, #6e7781);
+  font-style: italic;
+}
+.cm-tok-keyword {
+  color: var(--hl-keyword, #cf222e);
+}
+.cm-tok-string {
+  color: var(--hl-string, #0a3069);
+}
+.cm-tok-number {
+  color: var(--hl-number, #0550ae);
+}
+.cm-tok-title {
+  color: var(--hl-title, #8250df);
+}
+.cm-tok-type {
+  color: var(--hl-type, #953800);
+}
+.cm-tok-variable {
+  color: var(--hl-variable, #953800);
+}
+.cm-tok-literal {
+  color: var(--hl-literal, #0550ae);
+}
+.cm-tok-meta {
+  color: var(--hl-meta, #6e7781);
+}
+.cm-tok-symbol {
+  color: var(--hl-symbol, #0550ae);
+}
+.cm-tok-addition {
+  color: var(--hl-addition, #116329);
+}
+.cm-tok-deletion {
+  color: var(--hl-deletion, #82071e);
+}
+.cm-tok-invalid {
+  color: var(--hl-deletion, #82071e);
+  text-decoration: underline wavy;
+}
+
+/* Markdown's own tokens — only meaningful in the plain edit mode
+ * and on the current (source) line in live mode. */
+.cm-tok-md-heading {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.cm-tok-md-strong {
+  font-weight: 700;
+}
+.cm-tok-md-em {
+  font-style: italic;
+}
+.cm-tok-md-del {
+  text-decoration: line-through;
+}
+.cm-tok-md-link,
+.cm-tok-md-url {
+  color: var(--primary);
+}
+.cm-tok-md-code {
+  color: var(--hl-string, #0a3069);
+  font-family: var(--font-mono);
+}
+.cm-tok-md-quote {
+  color: var(--foreground-muted);
+}
+.cm-tok-md-list,
+.cm-tok-md-sep,
+.cm-tok-md-mark {
+  color: var(--foreground-subtle);
+}
+
+/* ============================================================
+ * Live mode — line-decoration 块级样式
+ *
+ * .cm-md-block-* 类由 livePreview.ts 的 LineDecoration 加到 .cm-line
+ * 上. 字号 / 字重 / 缩进 / 引用线全部在此声明, 与 preview.css 的
+ * .preview-content 同名 token 数值保持一致 (单一字号真理来源).
+ *
+ * 关键: font-size 用 em 单位, 相对于 .cm-live .cm-content 的 14px
+ * 基础字号, 因此 H1=2em=28px, H2=1.5em=21px, 与 preview 完全一致.
+ * line-height 按字号反算, 让 字号 * 行高 约等于 --editor-line-height
+ * (1.5), 与 cm-line 的 scroller 行高严格同高, 避免行高错位.
+ * ============================================================ */
+
+/* live 模式基础字号: 与 preview 同步 14px, 字体用 --font-sans. */
+.cm-live .cm-content {
+  font-size: var(--preview-font-size, 14px);
+  font-family: var(--font-sans);
+}
+
+/* 纸张内边距 — edit 与 live 共用. 特异性用 .cm-editor .cm-content
+ * (0,2,0) 避免被 CodeMirror 自带基础样式压掉. */
+.cm-editor .cm-content {
+  padding: var(--editor-pad-y) var(--editor-pad-x);
+}
+
+/* 源码行颜色 — 用 --editor-body 与 preview 的段落色保持一致. */
+.cm-live .cm-line {
+  color: var(--editor-body);
+}
+
+/* live 模式 scroller 行高与 edit / preview 统一为 --editor-line-height.
+ * 块级类 (h1 / h2 / ...) 的 line-height 按字号反算覆盖此值. */
+.cm-live .cm-editor .cm-scroller {
+  line-height: var(--editor-line-height);
+}
+
+/* ---- 标题块 ---------------------------------------------------------
+ * 字号 / 字重 / 行高 与 preview.css 的 .preview-content h1-h6 严格一致,
+ * 用 em 单位让 live 层跟着编辑器字号缩放. */
+.cm-live .cm-md-block-h1 {
+  font-size: 2em;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0.8em 0 0.4em;
+}
+.cm-live .cm-md-block-h2 {
+  font-size: 1.5em;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0.75em 0 0.4em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.cm-live .cm-md-block-h3 {
+  font-size: 1.3em;
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 0.7em 0 0.35em;
+}
+.cm-live .cm-md-block-h4 {
+  font-size: 1.12em;
+  font-weight: 600;
+  line-height: 1.34;
+  margin: 0.6em 0 0.3em;
+}
+.cm-live .cm-md-block-h5 {
+  font-size: 1em;
+  font-weight: 600;
+  line-height: var(--editor-line-height);
+  margin: 0.5em 0 0.25em;
+}
+.cm-live .cm-md-block-h6 {
+  font-size: 0.9em;
+  font-weight: 600;
+  line-height: 1.67;
+  color: var(--foreground-muted);
+  margin: 0.5em 0 0.25em;
+}
+
+/* 标题语法标记 (#) 融入标题: 同色同字重, 视觉上不像独立标记.
+ * 这样 live 标题更接近 preview (preview 里没有 #, 但这里 # 与文字
+ * 同色同字号, 不再突兀). */
+.cm-live .cm-md-block-h1 .cm-md-mark,
+.cm-live .cm-md-block-h2 .cm-md-mark,
+.cm-live .cm-md-block-h3 .cm-md-mark,
+.cm-live .cm-md-block-h4 .cm-md-mark,
+.cm-live .cm-md-block-h5 .cm-md-mark,
+.cm-live .cm-md-block-h6 .cm-md-mark {
+  color: inherit;
+  font-weight: inherit;
+  opacity: 0.55;
+}
+
+/* ---- 引用块 ---------------------------------------------------------
+ * 左侧竖线 + 左缩进, 颜色用 muted, 与 preview 的 blockquote 一致.
+ * 行级装饰无跨行容器, 因此每行独立画竖线 (border-left). */
+.cm-live .cm-md-block-quote {
+  padding-left: 16px;
+  border-left: 3px solid var(--primary);
+  color: var(--foreground-muted);
+  background: transparent;
+}
+
+/* 引用标记 (>) 淡化 */
+.cm-live .cm-md-block-quote .cm-md-mark {
+  color: var(--primary);
+  opacity: 0.6;
+}
+
+/* ---- 列表块 ---------------------------------------------------------
+ * 缩进让 - item / 1. item 的内容与普通段落对齐. 行级装饰无 <ul>
+ * 容器, 列表点 / 序号由 markdown 源码本身显示 (始终可见). */
+.cm-live .cm-md-block-list {
+  padding-left: 1.4em;
+  color: var(--foreground-muted);
+}
+
+/* 列表标记 (- * 1.) 淡化 */
+.cm-live .cm-md-block-list .cm-md-mark {
+  color: var(--foreground-subtle);
+  opacity: 0.7;
+}
+
+/* ---- 代码块 ---------------------------------------------------------
+ * 字体切换 mono, 背景轻染. 行级装饰无 <pre> 容器, 因此用整行背景
+ * (不依赖 padding), 围栏三反引号标记由 cm-tok-md-mark 类淡显. */
+.cm-live .cm-md-block-code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  line-height: 1.67;
+  background: var(--surface-2);
+  color: var(--foreground);
+}
+
+/* 代码围栏标记淡化 */
+.cm-live .cm-md-block-code .cm-md-mark {
+  color: var(--foreground-subtle);
+  opacity: 0.6;
+}
+
+/* ---- 分隔线块 -------------------------------------------------------
+ * --- / *** 本身可见, 这里加个上边框作为分隔线视觉. */
+.cm-live .cm-md-block-hr {
+  border-top: 1px solid var(--border-subtle);
+  color: var(--foreground-subtle);
+  padding-top: 0.5em;
+}
+
+/* ---- 行内加粗 / 斜体标记淡化, 更接近 preview 的纯样式 -------- */
+.cm-live .cm-tok-md-strong .cm-md-mark,
+.cm-live .cm-tok-md-em .cm-md-mark,
+.cm-live .cm-tok-md-del .cm-md-mark {
+  color: var(--foreground-subtle);
+  opacity: 0.5;
+}

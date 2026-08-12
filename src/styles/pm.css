@@ -1,0 +1,236 @@
+/* ProseMirror / TipTap live 视图样式（Phase 1）。
+   白纸浮层 + 内边距 + 排版；标记是真实 schema mark，无语法符号可见。
+
+   本文件与 preview.css 共用同一套设计令牌（--primary / --surface-2 /
+   --border-subtle / --radius-* / --foreground* 等），逐语法类型对齐
+   preview，确保 live / preview 两视图视觉一致，且暗色模式自动跟随
+   （旧版曾用 --paper/--text/--accent 等未在 theme.css 定义的临时变量，
+   浅色写死、暗色不跟随，已废弃）。 */
+
+.pm-live {
+  height: 100%;
+  overflow: auto;
+  /* 浮于 editor-card 之上，底色与卡片一致（暗色沿用 --card） */
+  background: var(--card);
+}
+
+.pm-editor.ProseMirror {
+  min-height: 100%;
+  /* 纸张内边距与 edit / preview 共享 --editor-pad-* 令牌，三视图正文边距统一 */
+  padding: var(--editor-pad-y) var(--editor-pad-x) 40vh;
+  font-family: var(--font-sans);
+  font-size: var(--preview-font-size, 14px);
+  /* 非段落 / 非标题文本的行高，与 preview 基础行高（--editor-line-height）一致 */
+  line-height: var(--editor-line-height);
+  color: var(--foreground);
+  outline: none;
+  caret-color: var(--primary);
+}
+
+.pm-editor.ProseMirror:focus {
+  outline: none;
+}
+
+/* ---- Paragraph / inline -------------------------------------------- */
+
+.pm-editor p {
+  line-height: 1.7;
+  margin: 0 0 14px;
+  color: var(--editor-body);
+}
+
+.pm-editor strong {
+  font-weight: 700;
+}
+.pm-editor em {
+  font-style: italic;
+}
+.pm-editor s,
+.pm-editor del {
+  text-decoration: line-through;
+}
+
+/* ---- Headings ------------------------------------------------------- */
+/* 字号 / 字重 / 行高 / 间距 严格对齐 preview.css 的 .preview-content h1-h6 */
+
+.pm-editor h1,
+.pm-editor h2,
+.pm-editor h3,
+.pm-editor h4,
+.pm-editor h5,
+.pm-editor h6 {
+  line-height: 1.25;
+  color: var(--foreground);
+  letter-spacing: -0.01em;
+}
+
+.pm-editor h1 {
+  font-size: 2em;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0.8em 0 0.4em;
+}
+.pm-editor h2 {
+  font-size: 1.5em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0.75em 0 0.4em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.pm-editor h3 {
+  font-size: 1.3em;
+  font-weight: 600;
+  margin: 0.7em 0 0.35em;
+}
+.pm-editor h4 {
+  font-size: 1.12em;
+  font-weight: 600;
+  margin: 0.6em 0 0.3em;
+}
+.pm-editor h5 {
+  font-size: 1em;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+}
+.pm-editor h6 {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--foreground-muted);
+  margin: 0.5em 0 0.25em;
+}
+
+/* ---- Lists ---------------------------------------------------------- */
+
+.pm-editor ul,
+.pm-editor ol {
+  padding-left: 1.6em;
+  margin: 0 0 14px;
+  color: var(--foreground-muted);
+}
+
+.pm-editor li {
+  margin: 4px 0;
+}
+
+/* ---- Blockquote ----------------------------------------------------- */
+/* 与 preview 一致：左竖线 + 浅蓝底 + 圆角 */
+
+.pm-editor blockquote {
+  margin: 0 0 16px;
+  padding: 4px 16px;
+  border-left: 3px solid var(--primary);
+  background: var(--primary-soft);
+  color: var(--foreground-muted);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.pm-editor blockquote p {
+  margin: 6px 0;
+}
+
+/* ---- Horizontal rule ----------------------------------------------- */
+
+.pm-editor hr {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 20px 0;
+}
+
+/* ---- Links ---------------------------------------------------------- */
+
+.pm-editor a {
+  color: var(--primary);
+  text-decoration: none;
+  cursor: pointer;
+}
+.pm-editor a:hover {
+  text-decoration: underline;
+}
+
+/* ---- Images --------------------------------------------------------- */
+
+.pm-editor img {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+}
+
+/* ---- Inline code ---------------------------------------------------- */
+/* :not(pre) 选择器在 TipTap 下等价于「裸 <code>」，pre 内的 code 由下方规则清空 */
+
+.pm-editor code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  color: var(--foreground);
+}
+.pm-editor pre code {
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+/* ---- Fenced code ---------------------------------------------------- */
+/* preview 用 .code-card 组件（带复制按钮），此处用等价卡片样式对齐视觉 */
+
+.pm-editor pre {
+  background: var(--muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  margin: 16px 0 24px;
+}
+
+/* ---- Tables --------------------------------------------------------- */
+
+.pm-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 16px;
+  font-size: 13px;
+}
+.pm-editor th,
+.pm-editor td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+}
+.pm-editor th {
+  background: var(--surface-2);
+  color: var(--foreground);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pm-editor tr:nth-child(even) td {
+  background: var(--surface);
+}
+
+/* ---- Task list ------------------------------------------------------ */
+
+.pm-editor ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.2em;
+}
+.pm-editor ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+.pm-editor ul[data-type="taskList"] li > label {
+  margin-top: 0.25em;
+}
+
+/* ---- Placeholder ---------------------------------------------------- */
+
+.pm-editor .is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--foreground-subtle);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

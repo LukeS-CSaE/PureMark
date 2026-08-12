@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "PureMark",
+  "version": "0.1.0",
+  "identifier": "com.puremark.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "PureMark",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 960,
+        "minHeight": 480,
+        "decorations": false,
+        "transparent": true,
+        "windowEffects": { "effects": ["acrylic"] },
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "preventOverflow": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown"],
+        "name": "Markdown Document",
+        "description": "PureMark Markdown document",
+        "mimeType": "text/markdown",
+        "role": "Editor"
+      }
+    ]
+  }
+}

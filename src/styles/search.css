@@ -1,0 +1,112 @@
+/* ============================================================
+ * Search panel (iter2-ext T02)
+ * Self-contained, theme-variable driven. Mirrors the design spec
+ * (`.search-field` / `.search-result-item` / `.search-hl` / ...).
+ * ============================================================ */
+
+.search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 0 8px;
+}
+
+.search-icon {
+  flex: none;
+  color: var(--foreground-muted);
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 8px 4px;
+  font-size: 13px;
+  color: var(--foreground);
+}
+
+.search-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--foreground-muted);
+}
+
+.search-close:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.search-count {
+  font-size: 12px;
+  color: var(--foreground-muted);
+  padding: 4px 2px 6px;
+}
+
+.search-result-list {
+  max-height: 240px;
+  overflow: auto;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.search-result-item {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 6px 8px;
+  cursor: pointer;
+  color: var(--foreground);
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+}
+
+.search-result-item:hover {
+  background: var(--surface-hover);
+}
+
+.search-result-item.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.search-result-line {
+  flex: none;
+  width: 28px;
+  text-align: right;
+  color: var(--foreground-muted);
+  user-select: none;
+}
+
+.search-result-snippet {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+}
+
+.search-hl {
+  background: #fde047;
+  color: #1f2328;
+  border-radius: 4px;
+  padding: 0 1px;
+}
+
+.search-result-item.active .search-hl {
+  background: #fb923c;
+}

@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pureMD 编辑器</title>
+    <style id="theme-vars">
+/* pureMD Redesign — modern flat design tokens */
+:root {
+  /* Brand primary: single cool cyan hue */
+  --puremd-primary: #0ea5e9;
+  --puremd-primary-foreground: #ffffff;
+  --puremd-primary-hover: #0284c7;
+  --puremd-primary-soft: rgba(14, 165, 233, 0.10);
+
+  /* Neutral surfaces */
+  --puremd-background: #f4f6f8;
+  --puremd-surface: #ffffff;
+  --puremd-surface-2: #eef0f2;
+  --puremd-surface-3: #e4e7eb;
+
+  /* Text */
+  --puremd-foreground: #1f2328;
+  --puremd-foreground-muted: #656d76;
+  --puremd-foreground-subtle: #8c959f;
+  --puremd-foreground-on-dark: #ffffff;
+
+  /* Dividers / borders */
+  --puremd-border: #d9dde1;
+  --puremd-border-subtle: #e9ebef;
+  --puremd-input: #d9dde1;
+  --puremd-ring: rgba(14, 165, 233, 0.35);
+
+  /* Semantic aliases (also consumed by apply-html-head-contract) */
+  --puremd-card: #ffffff;
+  --puremd-card-foreground: #1f2328;
+  --puremd-popover: #ffffff;
+  --puremd-popover-foreground: #1f2328;
+  --puremd-muted: #f1f2f4;
+  --puremd-muted-foreground: #656d76;
+
+  /* Radius scale */
+  --puremd-radius-sm: 4px;
+  --puremd-radius-md: 8px;
+  --puremd-radius-lg: 12px;
+
+  /* Shadows (subtle, static cards <= 0.05 alpha) */
+  --puremd-shadow-1: 0 1px 2px rgba(31, 35, 40, 0.04), 0 1px 1px rgba(31, 35, 40, 0.02);
+  --puremd-shadow-2: 0 8px 24px -8px rgba(31, 35, 40, 0.12);
+  --puremd-shadow-3: 0 24px 60px -20px rgba(31, 35, 40, 0.22);
+
+  /* Typography */
+  --puremd-font-sans: Inter, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --puremd-font-mono: "JetBrains Mono", "Fira Code", "SF Mono", Consolas, "Noto Sans Mono SC", monospace;
+
+  /* App chrome tokens */
+  --puremd-sidebar-width: 248px;
+  --puremd-header-height: 36px;
+  --puremd-statusbar-height: 34px;
+  --puremd-toolbar-height: 46px;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--puremd-background);
+    --color-foreground: var(--puremd-foreground);
+    --color-card: var(--puremd-card);
+    --color-card-foreground: var(--puremd-card-foreground);
+    --color-popover: var(--puremd-popover);
+    --color-popover-foreground: var(--puremd-popover-foreground);
+    --color-primary: var(--puremd-primary);
+    --color-primary-foreground: var(--puremd-primary-foreground);
+    --color-muted: var(--puremd-muted);
+    --color-muted-foreground: var(--puremd-muted-foreground);
+    --color-border: var(--puremd-border);
+    --color-input: var(--puremd-input);
+    --color-ring: var(--puremd-ring);
+    --radius-sm: var(--puremd-radius-sm);
+    --radius-md: var(--puremd-radius-md);
+    --radius-lg: var(--puremd-radius-lg);
+  }
+  @layer base {
+    body { background: var(--puremd-background); color: var(--puremd-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--puremd-background); }
+      .text-background { color: var(--puremd-background); }
+      .border-background { border-color: var(--puremd-background); }
+      .ring-background { --tw-ring-color: var(--puremd-background); }
+      .bg-foreground { background-color: var(--puremd-foreground); }
+      .text-foreground { color: var(--puremd-foreground); }
+      .border-foreground { border-color: var(--puremd-foreground); }
+      .ring-foreground { --tw-ring-color: var(--puremd-foreground); }
+      .bg-card { background-color: var(--puremd-card); }
+      .text-card { color: var(--puremd-card); }
+      .border-card { border-color: var(--puremd-card); }
+      .ring-card { --tw-ring-color: var(--puremd-card); }
+      .bg-card-foreground { background-color: var(--puremd-card-foreground); }
+      .text-card-foreground { color: var(--puremd-card-foreground); }
+      .border-card-foreground { border-color: var(--puremd-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--puremd-card-foreground); }
+      .bg-popover { background-color: var(--puremd-popover); }
+      .text-popover { color: var(--puremd-popover); }
+      .border-popover { border-color: var(--puremd-popover); }
+      .ring-popover { --tw-ring-color: var(--puremd-popover); }
+      .bg-popover-foreground { background-color: var(--puremd-popover-foreground); }
+      .text-popover-foreground { color: var(--puremd-popover-foreground); }
+      .border-popover-foreground { border-color: var(--puremd-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--puremd-popover-foreground); }
+      .bg-primary { background-color: var(--puremd-primary); }
+      .text-primary { color: var(--puremd-primary); }
+      .border-primary { border-color: var(--puremd-primary); }
+      .ring-primary { --tw-ring-color: var(--puremd-primary); }
+      .bg-primary-foreground { background-color: var(--puremd-primary-foreground); }
+      .text-primary-foreground { color: var(--puremd-primary-foreground); }
+      .border-primary-foreground { border-color: var(--puremd-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--puremd-primary-foreground); }
+      .bg-muted { background-color: var(--puremd-muted); }
+      .text-muted { color: var(--puremd-muted); }
+      .border-muted { border-color: var(--puremd-muted); }
+      .ring-muted { --tw-ring-color: var(--puremd-muted); }
+      .bg-muted-foreground { background-color: var(--puremd-muted-foreground); }
+      .text-muted-foreground { color: var(--puremd-muted-foreground); }
+      .border-muted-foreground { border-color: var(--puremd-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--puremd-muted-foreground); }
+      .bg-border { background-color: var(--puremd-border); }
+      .text-border { color: var(--puremd-border); }
+      .border-border { border-color: var(--puremd-border); }
+      .ring-border { --tw-ring-color: var(--puremd-border); }
+      .bg-input { background-color: var(--puremd-input); }
+      .text-input { color: var(--puremd-input); }
+      .border-input { border-color: var(--puremd-input); }
+      .ring-input { --tw-ring-color: var(--puremd-input); }
+      .bg-ring { background-color: var(--puremd-ring); }
+      .text-ring { color: var(--puremd-ring); }
+      .border-ring { border-color: var(--puremd-ring); }
+      .ring-ring { --tw-ring-color: var(--puremd-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden font-sans antialiased">
+    <main>
+      <style>
+        .puremd-app {
+          display: flex;
+          flex-direction: column;
+          height: 100vh;
+          min-height: 100vh;
+          overflow: hidden;
+          background: var(--puremd-background);
+          color: var(--puremd-foreground);
+          font-family: var(--puremd-font-sans);
+        }
+        .puremd-header {
+          height: var(--puremd-header-height);
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 16px;
+          background: transparent;
+          border-bottom: 1px solid var(--puremd-border-subtle);
+        }
+        .puremd-body {
+          flex: 1;
+          display: flex;
+          min-height: 0;
+        }
+        .puremd-sidebar {
+          width: var(--puremd-sidebar-width);
+          flex-shrink: 0;
+          display: flex;
+          flex-direction: column;
+          background: transparent;
+          border-right: 1px solid var(--puremd-border-subtle);
+        }
+        .puremd-sidebar-head {
+          height: var(--puremd-header-height);
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 14px;
+          border-bottom: 1px solid var(--puremd-border-subtle);
+        }
+        .puremd-filelist-card {
+          margin: 12px 14px 14px;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+          background: var(--puremd-card);
+          border: 1px solid var(--puremd-border-subtle);
+          border-radius: var(--puremd-radius-lg);
+          box-shadow: var(--puremd-shadow-2);
+          overflow: hidden;
+          padding: 12px;
+        }
+        .puremd-filelist-open {
+          flex-shrink: 0;
+          margin-bottom: 8px;
+        }
+        .puremd-filelist-open button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          width: 100%;
+          padding: 7px 0;
+          border-radius: var(--puremd-radius-md);
+          border: 1px solid var(--puremd-border);
+          background: var(--puremd-card);
+          color: var(--puremd-foreground-muted);
+          font-size: 13px;
+          cursor: pointer;
+        }
+        .puremd-filelist-open button:hover {
+          background: var(--puremd-surface-2);
+          color: var(--puremd-foreground);
+        }
+        .puremd-filelist {
+          flex: 1;
+          overflow: auto;
+          padding: 0;
+        }
+        .puremd-fileitem {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 7px 10px;
+          border-radius: var(--puremd-radius-md);
+          color: var(--puremd-foreground-muted);
+          cursor: pointer;
+        }
+        .puremd-fileitem:hover {
+          background: var(--puremd-surface-2);
+          color: var(--puremd-foreground);
+        }
+        .puremd-fileitem.active {
+          background: var(--puremd-primary-soft);
+          color: var(--puremd-primary);
+        }
+        .puremd-workspace {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+          padding: 16px 20px 0;
+        }
+        .puremd-tabs {
+          flex-shrink: 0;
+          display: flex;
+          align-items: flex-end;
+          gap: 4px;
+          overflow-x: auto;
+          padding-bottom: 10px;
+        }
+        .puremd-tab {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 14px;
+          border-radius: var(--puremd-radius-md);
+          border: 1px solid transparent;
+          color: var(--puremd-foreground-muted);
+          background: transparent;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+        .puremd-tab:hover {
+          background: var(--puremd-surface-2);
+          color: var(--puremd-foreground);
+        }
+        .puremd-tab.active {
+          background: var(--puremd-card);
+          color: var(--puremd-primary);
+          border-color: var(--puremd-border);
+          box-shadow: var(--puremd-shadow-1);
+        }
+        .puremd-editor-card {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+          background: var(--puremd-card);
+          border: 1px solid var(--puremd-border-subtle);
+          border-radius: var(--puremd-radius-lg);
+          box-shadow: var(--puremd-shadow-2);
+          overflow: hidden;
+        }
+        .puremd-toolbar {
+          height: var(--puremd-toolbar-height);
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 0 12px;
+          border-bottom: 1px solid var(--puremd-border-subtle);
+          background: var(--puremd-card);
+        }
+        .puremd-toolgroup {
+          display: flex;
+          align-items: center;
+          gap: 2px;
+        }
+        .puremd-toolsep {
+          width: 1px;
+          height: 20px;
+          background: var(--puremd-border);
+          margin: 0 4px;
+        }
+        .puremd-btn-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 30px;
+          height: 30px;
+          border-radius: var(--puremd-radius-md);
+          border: 1px solid transparent;
+          background: transparent;
+          color: var(--puremd-foreground-muted);
+          cursor: pointer;
+        }
+        .puremd-btn-icon:hover {
+          background: var(--puremd-surface-2);
+          color: var(--puremd-foreground);
+        }
+        .puremd-btn-icon.active {
+          background: var(--puremd-primary-soft);
+          color: var(--puremd-primary);
+        }
+        .puremd-segment {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 5px 10px;
+          border: 1px solid var(--puremd-border);
+          background: var(--puremd-surface);
+          color: var(--puremd-foreground-muted);
+          cursor: pointer;
+        }
+        .puremd-segment:first-child { border-radius: var(--puremd-radius-md) 0 0 var(--puremd-radius-md); }
+        .puremd-segment:last-child { border-radius: 0 var(--puremd-radius-md) var(--puremd-radius-md) 0; }
+        .puremd-segment:hover { background: var(--puremd-surface-2); color: var(--puremd-foreground); }
+        .puremd-segment.active { background: var(--puremd-primary); color: var(--puremd-primary-foreground); border-color: var(--puremd-primary); }
+        .puremd-editor-content {
+          flex: 1;
+          overflow: auto;
+          padding: 32px 40px;
+        }
+        .puremd-statusbar {
+          height: var(--puremd-statusbar-height);
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 16px;
+          background: transparent;
+          color: var(--puremd-foreground-muted);
+          border-top: 1px solid var(--puremd-border-subtle);
+          font-size: 12px;
+        }
+        .puremd-statusbar-item {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .puremd-statusbar-item span + span::before {
+          content: "";
+          display: inline-block;
+          width: 4px;
+          height: 4px;
+          border-radius: 50%;
+          background: currentColor;
+          opacity: 0.35;
+          margin-right: 10px;
+          vertical-align: middle;
+        }
+        .puremd-codecard {
+          position: relative;
+          background: var(--puremd-muted);
+          border: 1px solid var(--puremd-border-subtle);
+          border-radius: var(--puremd-radius-md);
+          padding: 16px 18px;
+          margin: 16px 0 24px;
+          font-family: var(--puremd-font-mono);
+          font-size: 14px;
+          color: var(--puremd-foreground);
+        }
+        .puremd-codecard button {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          padding: 4px 10px;
+          border-radius: var(--puremd-radius-sm);
+          border: 1px solid var(--puremd-border);
+          background: var(--puremd-card);
+          color: var(--puremd-foreground-muted);
+          font-size: 12px;
+          cursor: pointer;
+        }
+        .puremd-codecard button:hover { color: var(--puremd-foreground); border-color: var(--puremd-border); }
+        .puremd-editor-content h1 { font-size: 28px; font-weight: 700; margin: 0 0 16px; }
+        .puremd-editor-content h2 { font-size: 22px; font-weight: 600; margin: 28px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--puremd-border-subtle); }
+        .puremd-editor-content h3 { font-size: 18px; font-weight: 600; margin: 20px 0 10px; }
+        .puremd-editor-content p { line-height: 1.7; margin: 0 0 14px; color: var(--puremd-foreground-muted); }
+        .puremd-editor-content p strong { color: var(--puremd-foreground); }
+        .puremd-editor-content kbd {
+          display: inline-block;
+          padding: 2px 6px;
+          border-radius: var(--puremd-radius-sm);
+          border: 1px solid var(--puremd-border);
+          background: var(--puremd-surface-2);
+          font-family: var(--puremd-font-mono);
+          font-size: 12px;
+          color: var(--puremd-foreground);
+        }
+      </style>
+
+      <div class="puremd-app" data-viewport-mode="app-shell">
+        <header class="puremd-header" style="border-image: none; border-image-source: none; border-color: transparent; border-style: none; border-width: 0px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:var(--puremd-radius-md);background:var(--puremd-primary);color:var(--puremd-primary-foreground);">
+              <i data-lucide="pen-tool" style="width:16px;height:16px;"></i>
+            </div>
+            <span style="font-weight:700;font-size:15px;">pureMD</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;color:var(--puremd-foreground-subtle);">
+            <button class="puremd-btn-icon"><i data-lucide="minus" style="width:16px;height:16px;"></i></button>
+            <button class="puremd-btn-icon"><i data-lucide="square" style="width:14px;height:14px;"></i></button>
+            <button class="puremd-btn-icon"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
+          </div>
+        </header>
+
+        <div class="puremd-body">
+          <aside class="puremd-sidebar" style="border-image: none; border-image-source: none; border-color: transparent; border-style: none; border-width: 0px;">
+            <div class="puremd-sidebar-head" style="border-image: none; border-image-source: none; border-color: transparent; border-style: none; border-width: 0px;">
+              <span style="font-size:11px;font-weight:700;letter-spacing:0.06em;color:var(--puremd-foreground-subtle);">EXPLORER</span>
+              <button class="puremd-btn-icon" title="隐藏/显示侧边栏"><i data-lucide="panel-left-close" style="width:16px;height:16px;"></i></button>
+            </div>
+            <div class="puremd-filelist-card" style="background-image: none; background-color: transparent; border-image: none; border-image-source: none; border-color: transparent; border-style: none; border-width: 0px; box-shadow: none;">
+              <div class="puremd-filelist-open">
+                <button>
+                  <i data-lucide="folder-open" style="width:14px;height:14px;"></i>
+                  Open Folder
+                </button>
+              </div>
+              <nav class="puremd-filelist">
+                <div class="puremd-fileitem"><i data-lucide="file-text" style="width:15px;height:15px;"></i><span style="font-size:13px;">欢迎.md</span></div>
+                <div class="puremd-fileitem active"><i data-lucide="file-text" style="width:15px;height:15px;"></i><span style="font-size:13px;">Markdown 语法.md</span></div>
+                <div class="puremd-fileitem"><i data-lucide="file-text" style="width:15px;height:15px;"></i><span style="font-size:13px;">实时编辑.md</span></div>
+                <div class="puremd-fileitem"><i data-lucide="file-text" style="width:15px;height:15px;"></i><span style="font-size:13px;">演讲模式.md</span></div>
+                <div class="puremd-fileitem"><i data-lucide="file-text" style="width:15px;height:15px;"></i><span style="font-size:13px;">快捷键.md</span></div>
+              </nav>
+            </div>
+          </aside>
+
+          <section class="puremd-workspace">
+            <div class="puremd-tabs">
+              <div class="puremd-tab"><span style="font-size:13px;">欢迎.md</span><i data-lucide="x" style="width:12px;height:12px;"></i></div>
+              <div class="puremd-tab active"><span style="font-size:13px;">Markdown 语法.md</span><i data-lucide="x" style="width:12px;height:12px;"></i></div>
+              <div class="puremd-tab"><span style="font-size:13px;">实时编辑.md</span><i data-lucide="x" style="width:12px;height:12px;"></i></div>
+              <div class="puremd-tab"><span style="font-size:13px;">演讲模式.md</span><i data-lucide="x" style="width:12px;height:12px;"></i></div>
+              <div class="puremd-tab"><span style="font-size:13px;">快捷键.md</span><i data-lucide="x" style="width:12px;height:12px;"></i></div>
+            </div>
+
+            <div class="puremd-editor-card">
+              <div class="puremd-toolbar">
+                <div class="puremd-toolgroup">
+                  <button class="puremd-btn-icon" title="新建"><i data-lucide="file-plus" style="width:15px;height:15px;"></i></button>
+                  <button class="puremd-btn-icon" title="打开"><i data-lucide="folder-open" style="width:15px;height:15px;"></i></button>
+                  <button class="puremd-btn-icon" title="保存"><i data-lucide="save" style="width:15px;height:15px;"></i></button>
+                </div>
+                <div class="puremd-toolsep"></div>
+                <div class="puremd-toolgroup">
+                  <button class="puremd-btn-icon" title="标题"><i data-lucide="heading" style="width:15px;height:15px;"></i></button>
+                  <button class="puremd-btn-icon" title="粗体"><i data-lucide="bold" style="width:15px;height:15px;"></i></button>
+                  <button class="puremd-btn-icon" title="斜体"><i data-lucide="italic" style="width:15px;height:15px;"></i></button>
+                  <button class="puremd-btn-icon" title="删除线"><i data-lucide="strikethrough" style="width:15px;height:15px;"></i></button>
+                  <button class="puremd-btn-icon" title="行内代码"><i data-lucide="code" style="width:15px;height:15px;"></i></button>
+                </div>
+                <div class="puremd-toolsep"></div>
+                <div class="puremd-toolgroup">
+                  <button class="puremd-btn-icon" title="无序列表"><i data-lucide="list" style="width:15px;height:15px;"></i></button>
+                  <button class="puremd-btn-icon" title="有序列表"><i data-lucide="list-ordered" style="width:15px;height:15px;"></i></button>
+                  <button class="puremd-btn-icon" title="任务列表"><i data-lucide="check-square" style="width:15px;height:15px;"></i></button>
+                  <button class="puremd-btn-icon" title="引用"><i data-lucide="quote" style="width:15px;height:15px;"></i></button>
+                  <button class="puremd-btn-icon" title="链接"><i data-lucide="link" style="width:15px;height:15px;"></i></button>
+                  <button class="puremd-btn-icon" title="图片"><i data-lucide="image" style="width:15px;height:15px;"></i></button>
+                  <button class="puremd-btn-icon" title="表格"><i data-lucide="table" style="width:15px;height:15px;"></i></button>
+                </div>
+                <div class="puremd-toolsep"></div>
+                <div class="puremd-toolgroup">
+                  <button class="puremd-segment"><i data-lucide="edit-3" style="width:14px;height:14px;"></i><span style="font-size:12px;">编辑</span></button>
+                  <button class="puremd-segment active"><i data-lucide="columns" style="width:14px;height:14px;"></i><span style="font-size:12px;">分屏</span></button>
+                  <button class="puremd-segment"><i data-lucide="eye" style="width:14px;height:14px;"></i><span style="font-size:12px;">预览</span></button>
+                </div>
+                <div style="flex:1;"></div>
+                <div class="puremd-toolgroup">
+                  <button class="puremd-btn-icon" title="搜索"><i data-lucide="search" style="width:15px;height:15px;"></i></button>
+                  <button class="puremd-btn-icon" title="设置"><i data-lucide="settings" style="width:15px;height:15px;"></i></button>
+                </div>
+              </div>
+
+              <div class="puremd-editor-content overflow-y-auto" data-scroll-region="primary">
+                <h1>Markdown 语法 — pureMD 都支持哪些</h1>
+                <p>这是一份能动手验证的速查表。切到 <strong>预览</strong> 模式（按 <kbd>Ctrl+Shift+P</kbd> 直到看到预览）就能看到每个块的渲染效果。</p>
+                <h2>标题</h2>
+                <div class="puremd-codecard" style="background-image: none; background-color: transparent;">
+                  <button>复制</button>
+                  <code># 一级  ## 二级  ### 三级  #### 四级</code>
+                </div>
+                <h1>一级标题</h1>
+                <h2>二级标题</h2>
+                <h3>三级标题</h3>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <footer class="puremd-statusbar">
+          <div class="puremd-statusbar-item">
+            <span>Ln 1, Col 1</span>
+            <span>89 lines</span>
+            <span>297 words</span>
+            <span>1,248 字</span>
+          </div>
+          <div class="puremd-statusbar-item">
+            <span>UTF-8</span>
+            <span>Markdown</span>
+          </div>
+        </footer>
+      </div>
+    </main>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

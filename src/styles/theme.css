@@ -1,0 +1,184 @@
+@import "tailwindcss";
+
+/* ============================================================
+ * PureMark design tokens
+ * Raw values live in :root so a dark theme can simply override
+ * them; the @theme inline block maps them to Tailwind utilities
+ * (bg-primary / text-foreground / border-border / rounded-md / ...).
+ * ============================================================ */
+:root {
+  /* Brand primary (initial value; overridden at runtime by applyAccent) */
+  --primary: #0071e3;
+  --primary-hover: #0066cc;
+  --primary-foreground: #ffffff;
+  --primary-soft: rgba(0, 113, 227, 0.1);
+
+  /* Neutral surfaces — Apple cool grey-white skeleton */
+  --background: #f5f5f7;
+  --surface: #ffffff;
+  --surface-2: #f5f5f7;
+  --surface-hover: #fbfbfd;   /* row hover tint (Apple) */
+  --surface-3: #e8e8ed;
+
+  /* Text — Apple ink hierarchy */
+  --foreground: #1d1d1f;
+  --foreground-muted: #6e6e73;
+  --foreground-subtle: #86868b;
+
+  /* Shared body-text colour for the editing surface.
+   * `preview.css` (`.preview-content p`) and `live.css` (`.cm-live .cm-line`)
+   * both consume this single token so the two renderers never drift apart on
+   * body colour (design §8.4). Defaults to the high-contrast `--foreground`. */
+  --editor-body: var(--foreground);
+
+  /* Borders / dividers — hairline-first (Apple Liquid Glass) */
+  --hairline: rgba(0, 0, 0, 0.07);
+  --border: rgba(0, 0, 0, 0.12);
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --input: rgba(0, 0, 0, 0.12);
+  --ring: rgba(0, 113, 227, 0.35);
+  --track: #e8e8ed;   /* segmented-control track / toggle-off fill */
+
+  /* Semantic aliases */
+  --card: #ffffff;
+  --card-foreground: #1d1d1f;
+  --popover: #ffffff;
+  --popover-foreground: #1d1d1f;
+  --muted: #f1f2f4;
+  --muted-foreground: #6e6e73;
+
+  /* Radius scale — keep sm/md/lg, add Apple tiers */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+  --radius-card: 18px;
+  --radius-panel: 22px;
+
+  /* Shadows — two-layer (tight contact + soft spread), Apple-style */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.05);
+  --shadow-2: 0 1px 3px rgba(0, 0, 0, 0.05), 0 14px 40px rgba(0, 0, 0, 0.05);
+  --shadow-3: 0 2px 8px rgba(0, 0, 0, 0.10), 0 30px 80px rgba(0, 0, 0, 0.24);
+
+  /* Motion easing — spring-like, CSS-first (Apple Liquid Glass) */
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+
+  /* Typography — Apple system stack (native, antialiased) */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, "JetBrains Mono", "Fira Code", Consolas,
+    "Noto Sans Mono SC", monospace;
+
+  /* Layout dimensions (NOT part of @theme — referenced directly). */
+  --layout-sidebar: 248px;
+  --layout-header: 40px;
+  --layout-toolbar: 46px;
+  --layout-statusbar: 34px;
+  /* iter2-ext: outline panel base width; overridden inline from config.tocWidth
+   * and finally constrained by clamp() in layout.css (S-12). */
+  --layout-toc: 220px;
+  /* iter2 multi-pane workspace (design T03-3.9) */
+  --layout-pane-header: 28px;
+  --pane-min-width: 240px;
+  --pane-resizer: 6px;
+
+  /* Editor paper */
+  --editor-pad-y: 32px;
+  --editor-pad-x: 40px;
+  /* 编辑区"纸张"行高 — edit / live / preview 三视图共用, 统一阅读节奏.
+   * live 的渲染行 widget 高度锁定 = 此值 × 1em, 必须与 cm-line 行高严格
+   * 相等, 否则点击坐标错位 (见 live.css 的 .cm-rendered-line 锁定).
+   * 1.6 = 在 1.5 基础上略放宽, 修正 edit 视图行距偏窄的观感. */
+  --editor-line-height: 1.6;
+
+  /* Fluent acrylic (system-level: header / sidebar / statusbar) */
+  --acrylic: rgba(244, 246, 248, 0.66);
+  --acrylic-strong: rgba(244, 246, 248, 0.82);
+  --acrylic-border-top: rgba(255, 255, 255, 0.55);
+
+  /* Modal scrim — tokenised so dark mode is not stuck with a light wash (R-18) */
+  --scrim: rgba(15, 23, 42, 0.18);
+
+  /* ---- Code highlighting palette (design §1.6, GitHub Light) --------------
+   * Consumed by BOTH `highlight.css` (.hljs-* in the preview) and `live.css`
+   * (.cm-tok-* inside CodeMirror), so the two renderers can never drift. */
+  --hl-comment: #6e7781;
+  --hl-keyword: #cf222e;
+  --hl-string: #0a3069;
+  --hl-number: #0550ae;
+  --hl-title: #8250df;
+  --hl-type: #953800;
+  --hl-variable: #953800;
+  --hl-literal: #0550ae;
+  --hl-meta: #6e7781;
+  --hl-symbol: #0550ae;
+  --hl-addition: #116329;
+  --hl-deletion: #82071e;
+}
+
+/* Map raw tokens to Tailwind theme so utilities inherit at runtime
+ * (inline => no extra variable layer, dark mode overrides :root). */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-foreground-subtle: var(--foreground-subtle);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --shadow-1: var(--shadow-1);
+  --shadow-2: var(--shadow-2);
+  --shadow-3: var(--shadow-3);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+/* ============================================================
+ * Dark theme — only overrides the raw values; utilities follow.
+ * ============================================================ */
+[data-theme="dark"] {
+  --background: #0d1117;
+  --surface: #161b22;
+  --surface-2: #1c2230;
+  --surface-hover: #1b212b;
+  --surface-3: #232a36;
+  --foreground: #e6edf3;
+  --foreground-muted: #9aa4b2;
+  --foreground-subtle: #6e7681;
+  --hairline: rgba(255, 255, 255, 0.1);
+  --border: rgba(255, 255, 255, 0.12);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --input: rgba(255, 255, 255, 0.14);
+  --track: #2a313c;
+  --muted: #161b22;
+  --muted-foreground: #9aa4b2;
+  --card: #161b22;
+  --popover: #1c2230;
+  --primary-soft: rgba(0, 113, 227, 0.22);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 1px 3px rgba(0, 0, 0, 0.4), 0 14px 40px rgba(0, 0, 0, 0.5);
+  --shadow-3: 0 2px 8px rgba(0, 0, 0, 0.5), 0 30px 80px rgba(0, 0, 0, 0.65);
+
+  /* Fluent acrylic — dark */
+  --acrylic: rgba(20, 25, 33, 0.6);
+  --acrylic-strong: rgba(20, 25, 33, 0.8);
+  --acrylic-border-top: rgba(255, 255, 255, 0.08);
+}

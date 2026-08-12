@@ -1,0 +1,109 @@
+classDiagram
+    class FileNode {
+        +string id
+        +string name
+        +string path
+        +boolean isDir
+        +FileNode[] children
+        +number depth
+    }
+    class EditorTab {
+        +string id
+        +string path
+        +string name
+        +string content
+        +string savedContent
+        +boolean dirty
+        +Cursor cursor
+    }
+    class Cursor {
+        +number line
+        +number col
+    }
+    class AppConfig {
+        +string theme
+        +string fontFamily
+        +number fontSize
+        +ViewMode defaultView
+        +boolean sidebarVisible
+        +string lastFolder
+        +string[] recentFiles
+        +WindowSize window
+        +boolean autoSave
+        +number autoSaveDelay
+    }
+    class WindowSize {
+        +number width
+        +number height
+        +boolean maximized
+    }
+    class ViewMode {
+        <<enum>>
+        edit
+        split
+        preview
+    }
+    class FormatCommand {
+        <<enum>>
+        h1
+        h2
+        h3
+        bold
+        italic
+        strike
+        code
+        ul
+        ol
+        task
+        quote
+        link
+        image
+        table
+    }
+    class useTabsStore {
+        -EditorTab[] tabs
+        -string activeId
+        +openTab(file) void
+        +closeTab(id) void
+        +updateContent(id, value) void
+        +saveActive() void
+        +isAnyDirty() boolean
+    }
+    class useUIStore {
+        -ViewMode viewMode
+        -boolean sidebarVisible
+        -string currentFolder
+        -FileNode[] tree
+        -boolean searchOpen
+        +setViewMode(m) void
+        +toggleSidebar() void
+        +setFolder(p, tree) void
+    }
+    class useConfigStore {
+        -AppConfig config
+        +load() void
+        +save() void
+        +update(patch) void
+    }
+    class fsCommands {
+        +openFolderDialog() string
+        +openFileDialog() string
+        +buildTree(path) FileNode[]
+        +readFileText(path) string
+        +writeFileText(path, c) void
+    }
+    class markdown {
+        +render(md) string
+    }
+    class formatText {
+        +apply(command, text, sel) string
+    }
+    EditorTab "1" *-- "1" Cursor : has
+    AppConfig "1" *-- "1" WindowSize : has
+    FileNode ..> useUIStore : storedIn
+    EditorTab ..> useTabsStore : managedBy
+    useTabsStore ..> fsCommands : saveVia
+    useUIStore ..> fsCommands : buildTreeVia
+    useConfigStore ..> fsCommands : persistVia
+    markdown ..> highlight : uses
+    formatText ..> EditorTab : mutateContent

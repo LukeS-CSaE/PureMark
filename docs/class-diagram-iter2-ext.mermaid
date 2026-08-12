@@ -1,0 +1,249 @@
+%% ============================================================
+%% PureMark iter2-ext — 增量类图
+%% 只画本轮新增 / 变更的类型与模块；iter2 既有部分见 class-diagram-iter2.mermaid
+%% ============================================================
+classDiagram
+    direction LR
+
+    %% ---------------- 枚举 ----------------
+    class AccentId {
+        <<enum>>
+        sky
+        blue
+        green
+        purple
+        orange
+        red
+        pink
+        custom
+    }
+    class TocPosition {
+        <<enum>>
+        left
+        right
+    }
+    class SidebarMode {
+        <<enum>>
+        files
+        toc
+    }
+    class GeometrySource {
+        <<enum>>
+        default
+        remembered
+        clamped
+        raised
+        maximized
+    }
+
+    %% ---------------- 数据结构 ----------------
+    class TocItem {
+        +string id
+        +number level_1to6
+        +string text
+        +number line_1based
+        +number index_0based
+    }
+
+    class WindowGeometry {
+        +number schema_2
+        +string unit_logical
+        +number width
+        +number height
+        +boolean maximized
+    }
+
+    class StartupGeometry {
+        +number width
+        +number height
+        +boolean maximize
+        +GeometrySource source
+    }
+
+    class AccentPreset {
+        +AccentId id
+        +string label
+        +string primary
+        +string hover
+    }
+
+    class AppConfigExt {
+        +number configVersion_3
+        +AccentId accent
+        +string accentCustom
+        +boolean tocVisible
+        +TocPosition tocPosition
+        +number tocWidth
+        +WindowSize window_DEPRECATED
+    }
+
+    %% ---------------- 纯逻辑模块 ----------------
+    class themeLibExt {
+        <<module>>
+        +ACCENT_PRESETS AccentPreset[]
+        +hexToRgb(hex) RGB
+        +relativeLuminance(hex) number
+        +shiftLightness(hex, delta) string
+        +deriveAccentVars(primary, hover, resolved) Record
+        +applyAccent(accent, custom, resolved) void
+        +applyTheme(resolved) void
+    }
+
+    class windowGeometry {
+        <<module>>
+        +WINDOW_MIN
+        +WINDOW_DEFAULT
+        +WINDOW_MARGIN
+        +isValidGeometry(v) boolean
+        +computeStartupGeometry(remembered, work) StartupGeometry
+    }
+
+    class tocLib {
+        <<module>>
+        +parseToc(md) TocItem[]
+        +slugify(text) string
+        +deriveSidebarMode(visible, pos, cur) SidebarMode
+    }
+
+    class contextMenuLib {
+        <<module>>
+        +installContextMenuGuard(opts) Function
+    }
+
+    %% ---------------- I/O / 注册表 / 路由 ----------------
+    class tauriLibExt {
+        <<module>>
+        -boolean geometryReady
+        -boolean clampedAtStartup
+        -StartupGeometry startupSize
+        +applyStartupGeometry() Promise
+        +persistWindowState() Promise
+        +listenWindowResize(cb) Promise
+        +registerCloseGuard(isDirty) Promise
+        +__setGeometryReadyForTest(v) void
+    }
+
+    class TocTarget {
+        <<interface>>
+        +revealHeading(item) void
+    }
+
+    class tocRegistry {
+        <<module>>
+        -Map~string,TocTarget~ targets
+        +registerTocTarget(paneId, t) void
+        +unregisterTocTarget(paneId, t) void
+        +getTocTarget(paneId) TocTarget
+        +clearTocTargets() void
+    }
+
+    class tocRouter {
+        <<module>>
+        +hydrateTocUi(cfg) void
+        +toggleToc() void
+        +setTocPosition(pos) void
+        +toggleTocPosition() void
+        +setSidebarMode(mode) void
+        +revealHeadingInFocusedPane(item) void
+    }
+
+    %% ---------------- Hook / Store ----------------
+    class useToc {
+        <<hook>>
+        +TocItem[] items
+        +PaneId paneId
+        +string tabId
+        +ViewMode viewMode
+        +boolean hasDoc
+    }
+
+    class useUIStoreExt {
+        <<store>>
+        +SidebarMode sidebarMode
+        +setSidebarMode(m) void
+    }
+
+    class useThemeExt {
+        <<hook>>
+        +commit(t) applyTheme_then_applyAccent
+    }
+
+    %% ---------------- 组件 ----------------
+    class TocList {
+        +TocItem[] items
+        +boolean hasDoc
+        +onSelect(item) void
+    }
+    class TocPanel {
+        +header_目录_close
+        +renders TocList
+    }
+    class SidebarExt {
+        +branchBy sidebarMode
+        +label EXPLORER_or_OUTLINE
+        +toggleButton_or_collapseButton
+    }
+    class ToolbarExt {
+        +tocToggleButton_ListTree
+        +tocPositionButton_PanelLeftRight
+    }
+    class SettingsPanelExt {
+        +themeSegment_light_dark_auto
+        +accentSwatches_7
+    }
+    class CodeEditorExt {
+        +registersTocTarget_byLine
+    }
+    class PreviewPaneExt {
+        +PaneId paneId
+        +focusPaneOnMouseDown
+        +registersTocTarget_byIndex
+    }
+
+    %% ---------------- 关系 ----------------
+    AppConfigExt ..> AccentId : accent
+    AppConfigExt ..> TocPosition : tocPosition
+    AccentPreset ..> AccentId : id
+
+    themeLibExt o-- AccentPreset : presets
+    themeLibExt ..> AppConfigExt : readsAccent
+
+    windowGeometry ..> WindowGeometry : validates
+    windowGeometry ..> StartupGeometry : produces
+    windowGeometry ..> GeometrySource
+    tauriLibExt ..> windowGeometry : pureCompute
+    tauriLibExt ..> WindowGeometry : persists
+
+    tocLib ..> TocItem : produces
+    tocLib ..> SidebarMode : derives
+    tocRegistry o-- TocTarget : registry
+    tocRouter ..> tocRegistry : dispatchReveal
+    tocRouter ..> tocLib : deriveSidebarMode
+    tocRouter ..> useUIStoreExt : setSidebarMode
+    tocRouter ..> AppConfigExt : persistsTocFlags
+    useUIStoreExt ..> SidebarMode
+
+    useToc ..> tocLib : parseToc_debounced200ms
+    useToc ..> TocItem
+    useThemeExt ..> themeLibExt : applyTheme_then_applyAccent
+
+    TocList ..> useToc : consumes
+    TocList ..> tocRouter : revealHeadingInFocusedPane
+    TocPanel *-- TocList : contains
+    SidebarExt ..> TocList : when_sidebarMode_toc
+    SidebarExt ..> tocRouter : setSidebarMode
+    ToolbarExt ..> tocRouter : toggleToc_togglePosition
+    SettingsPanelExt ..> themeLibExt : ACCENT_PRESETS
+    SettingsPanelExt ..> AppConfigExt : update_theme_accent
+
+    CodeEditorExt ..|> TocTarget : implementsByLine
+    PreviewPaneExt ..|> TocTarget : implementsByIndex
+    CodeEditorExt ..> tocRegistry : registersSelf
+    PreviewPaneExt ..> tocRegistry : registersSelf
+
+    contextMenuLib ..> AppConfigExt : none_pure
+
+    note for tocRegistry "与 editorRegistry 正交：键同为 paneId，但存于不同 Map。\npreview 窗格注册 TocTarget，但依旧不注册 EditorHandle\n（iter2 §8.5 约定保持成立）"
+    note for themeLibExt "applyTheme() 仍是唯一写 data-theme 的函数；\napplyAccent() 只写 documentElement 内联 CSS 变量\n（--primary / --primary-hover / --primary-soft / --ring / --primary-foreground）"
+    note for tocRouter "组件唯一入口，规约同 paneRouter：\n禁止组件直接写 config.tocVisible / tocPosition\n或 useUIStore.sidebarMode"
+    note for tauriLibExt "geometryReady 静默期：applyStartupGeometry 完成前\npersistWindowState 直接 return（修复 RC-2 自我污染）"

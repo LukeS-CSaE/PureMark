@@ -1,0 +1,190 @@
+%% ============================================================
+%% PureMark iter2 — 主链路时序图
+%% ① Live 模式：输入 -> 回车定格 -> 点回还原（R-01/02/03/05/06/07）
+%% ============================================================
+sequenceDiagram
+    actor U as 用户
+    participant CE as CodeEditor (CM6 EditorView)
+    participant LP as livePreviewPlugin (ViewPlugin)
+    participant ST as syntaxTree (Lezer)
+    participant DS as useDocSync
+    participant TS as useTabsStore
+
+    Note over U,TS: 【a】在空行输入 "## 第二章"
+    U->>CE: keydown / input
+    CE->>LP: ViewUpdate(docChanged=true, selectionSet=true)
+    LP->>LP: view.composing? → false，继续
+    LP->>LP: activeLineNumbers(state) = {12}
+    LP->>ST: iterate(view.visibleRanges)
+    ST-->>LP: ATXHeading2 @L12, HeaderMark[0,3)
+    LP->>LP: L12 ∈ activeLines → 不隐藏 HeaderMark，源码原样
+    LP-->>CE: DecorationSet（L12 无装饰）
+    CE->>DS: update listener（无 syncAnnotation）
+    DS->>TS: updateContent(tabId, doc.toString())
+    TS->>TS: dirty = content !== savedContent
+
+    Note over U,TS: 【b】按下 Enter —— 核心验收点 R-02
+    U->>CE: Enter
+    CE->>LP: ViewUpdate(docChanged, selectionSet)
+    LP->>LP: activeLineNumbers = {13}
+    LP->>ST: iterate(visibleRanges)
+    ST-->>LP: ATXHeading2 @L12, HeaderMark[0,3)
+    LP->>LP: L12 ∉ activeLines → replace(HeaderMark) + line(.cm-md-h2)
+    LP-->>CE: DecorationSet
+    CE-->>U: L12 立即呈现 h2 排版；L13 为活动行显示源码
+
+    Note over U,TS: 【c】点击已定格的 L12 —— R-03
+    U->>CE: mousedown @L12
+    CE->>LP: ViewUpdate(selectionSet=true, docChanged=false)
+    LP->>LP: activeLineNumbers = {12}
+    LP->>LP: L12 ∈ activeLines → 撤销隐藏
+    LP-->>CE: DecorationSet
+    CE-->>U: L12 还原为 "## 第二章" 源码，可编辑
+    Note over CE: 文档字符未变，仅装饰变化 → 不进 history
+
+    Note over U,TS: 【d】中文输入法 —— R-05
+    U->>CE: compositionstart
+    CE->>LP: frozen = true
+    loop 拼音候选未上屏
+        U->>CE: 输入 / 翻页候选
+        CE->>LP: ViewUpdate(composing=true)
+        LP->>LP: deco = deco.map(u.changes)
+    end
+    U->>CE: compositionend（上屏）
+    CE->>LP: frozen = false + rAF 强制重建
+    LP-->>CE: DecorationSet
+    CE->>DS: update listener
+    DS->>TS: updateContent(...)
+
+    Note over U,TS: 【e】撤销 —— R-07
+    U->>CE: Ctrl+Z
+    CE->>CE: history() undo（newGroupDelay 500ms 分组）
+    CE->>DS: ViewUpdate(docChanged)
+    DS->>TS: updateContent(tabId, doc.toString())
+
+
+%% ============================================================
+%% ② 分屏：开启 -> 同 buffer 双向同步 -> 聚焦切换 -> 异文件打开
+%%    （R-09/10/11/12/13/14）
+%% ============================================================
+sequenceDiagram
+    actor U as 用户
+    participant TB as Toolbar / LayoutToggle
+    participant PR as paneRouter
+    participant PS as usePanesStore
+    participant PA as Pane A (CM6 #A)
+    participant PB as Pane B (CM6 #B)
+    participant REG as editorRegistry
+    participant TS as useTabsStore
+    participant SB as StatusBar
+    participant FT as FileTree
+
+    Note over U,TS: 【a】开启分屏 —— R-09 / R-10
+    U->>TB: 点击「⧉ 分屏」
+    TB->>PR: splitToggle()
+    PR->>PS: setLayout('split')
+    PR->>PS: panes = [ {A, tabId:X, live}, {B, tabId:X, preview} ]
+    PS-->>PA: 重渲染（flex-basis = splitRatio）
+    PS-->>PB: 挂载新 CM6 / PreviewPane
+    PB->>REG: registerEditor('B', handle)
+
+    Note over U,TS: 【b】同 buffer 双向同步 —— R-10
+    U->>PA: 在 A 输入 "hello"
+    PA->>PA: transaction tr（无 syncAnnotation）
+    PA->>TS: updateContent(X, doc.toString())
+    PA->>REG: 查找 tabId===X && paneId!=='A' 的 handle
+    REG-->>PA: [handle B]
+    PA->>PB: dispatch({changes: tr.changes, annotations: syncAnnotation})
+    PB->>PB: CM6 自动 map 自身 selection + scrollTop
+    Note over PB: 内容同步 / 光标不跳 / 滚动不动
+    PB-->>PA: 带 syncAnnotation → 跳过回写，无回环
+
+    Note over U,TS: 【c】切换焦点窗格
+    U->>PB: 点击 Pane B 区域
+    PB->>PR: focusPane('B')
+    PR->>PS: setFocusedPaneId('B')
+    PR->>TS: setActive(paneB.tabId)
+    PS-->>SB: StatusBar 改读 B 的 tab + B.cursor
+    PS-->>TB: ViewSwitcher 高亮切为 B.viewMode
+
+    Note over U,TS: 【d】异文件打开 —— R-11
+    U->>FT: 侧栏点击 B.md
+    FT->>PR: openInFocusedPane({path,name,content})
+    PR->>TS: openTab(...) → tabId=Y
+    PR->>PS: setPaneTab('B', Y)
+    PR->>TS: setActive(Y)
+    Note over PA: Pane A 完全不动（仍显示 X）
+    PB->>PB: useEffect[tabId] → 快照旧 scrollTop → 重建 doc → 恢复 Y 的 scrollTop
+
+    Note over U,TS: 【e】拖拽分隔条 —— R-13
+    U->>TB: mousedown on .pane-resize-handle
+    loop mousemove（rAF 节流）
+        TB->>PS: setSplitRatio(clamp(x / containerW, 0.2, 0.8))
+    end
+    U->>TB: dblclick
+    TB->>PS: setSplitRatio(0.5)
+    TB->>PS: mouseup → useConfigStore.update({ splitRatio })
+
+    Note over U,TS: 【f】关闭窗格 / 关闭文档 —— R-14
+    U->>PB: 点击 Pane B 的 ✕
+    PB->>PR: closePane('B')
+    PR->>REG: unregisterEditor('B')
+    PR->>PS: layout='single'，panes=[A]，focusedPaneId='A'
+    U->>TS: 关闭文档标签 X（两窗格都在显示）
+    TS->>PR: detachTab(X)
+    PR->>PS: 所有 tabId===X 的 pane → null；B 变空 → 回退 single
+
+
+%% ============================================================
+%% ③ 主题 auto 解析（R-15/16/17/18）
+%%    前置：tauri.conf.json 必须移除 app.windows[0].theme = "Light"
+%% ============================================================
+sequenceDiagram
+    actor U as 用户
+    actor OS as Windows 系统
+    participant SP as SettingsPanel
+    participant CS as useConfigStore
+    participant TH as hooks/useTheme
+    participant TL as lib/theme
+    participant MM as matchMedia
+    participant DOM as html[data-theme]
+    participant UIS as useUIStore
+    participant CE as CodeEditor (CM6)
+
+    Note over U,CE: 【a】启动
+    CS->>CS: load() → migrateConfig(raw) → config.theme = 'auto'
+    CS-->>TH: config.theme 变化
+    TH->>TL: resolveTheme('auto')
+    TL->>MM: matchMedia('(prefers-color-scheme: dark)').matches
+    MM-->>TL: true
+    TL-->>TH: 'dark'
+    TH->>TL: applyTheme('dark')
+    TL->>DOM: documentElement.dataset.theme = 'dark'
+    Note over DOM: theme.css 覆盖 :root token → Tailwind 工具类全量跟随<br/>highlight.css --hl-* 同步切换
+    TH->>UIS: setResolvedTheme('dark')
+    UIS-->>CE: darkCompartment.reconfigure(EditorView.darkTheme.of(true))
+    TH->>MM: watchSystemTheme(cb)（仅 pref==='auto'）
+
+    Note over U,CE: 【b】OS 切换深/浅色 —— R-16
+    OS->>MM: prefers-color-scheme change → light
+    MM->>TH: cb('light')
+    TH->>TL: applyTheme('light')
+    TL->>DOM: dataset.theme = 'light'
+    TH->>UIS: setResolvedTheme('light')
+    UIS-->>CE: darkTheme.of(false)
+    Note over DOM,CE: 全界面 < 1s 内跟随
+
+    Note over U,CE: 【c】用户切到「深色」—— R-17
+    U->>SP: 点击 ☾ 深色
+    SP->>CS: update({ theme: 'dark' })
+    CS-->>TH: config.theme 变化
+    TH->>TH: 取消 matchMedia 订阅
+    TH->>TL: resolveTheme('dark') → applyTheme('dark')
+    TH->>UIS: setResolvedTheme('dark')
+
+    Note over U,CE: 【d】切回「跟随系统」
+    U->>SP: 点击 ⚙ 跟随系统
+    SP->>CS: update({ theme: 'auto' })
+    TH->>TL: resolveTheme('auto') → getSystemTheme()
+    TH->>MM: 重新订阅 change
+    SP-->>U: 灰字提示「当前跟随系统：浅色」

@@ -1,0 +1,28 @@
+[package]
+name = "puremark"
+version = "0.1.0"
+description = "PureMark - a minimal, local-first Markdown editor"
+authors = ["PureMark"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+# The Tauri build script compiles the binary crate; keep a lib target optional.
+name = "puremark_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-store = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[features]
+# This feature is used for production builds where `devUrl` is disabled.
+custom-protocol = ["tauri/custom-protocol"]
