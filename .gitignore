@@ -19,8 +19,9 @@ src-tauri/gen/
 # ========== Agent / tooling memory (local only) ==========
 .workbuddy/
 
-# ========== Scratch / debug files (underscore-prefixed) ==========
-_*
+# ========== Scratch / debug files (underscore-prefixed, repo root only) ==========
+# Scoped to the repo root ("/_*") so nested dirs like src/__tests__/ are NOT matched.
+/_*
 .tmp/
 
 # ========== QA / harness temporary artifacts ==========
