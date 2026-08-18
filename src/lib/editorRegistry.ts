@@ -31,6 +31,14 @@ export interface EditorHandle {
   focus(): void;
   /** Scroll a character offset into view without changing the selection. */
   scrollToOffset(offset: number): void;
+  /**
+   * Scroll a source line into view (search jump). `match` carries markdown
+   * offsets; `ordinal` is the match's 0-based index among all matches. CM6
+   * `edit` uses the exact `match` offsets to select + scroll; PM-based
+   * `live` / `preview` use `ordinal` to locate the exact occurrence (markdown
+   * offset ≠ PM position) and scroll it into view.
+   */
+  scrollToLine(lineNo: number, match?: { start: number; end: number }, ordinal?: number): void;
 }
 
 const handles = new Map<string, EditorHandle>();

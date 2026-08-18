@@ -47,6 +47,8 @@ function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     autoSave: true,
     autoSaveDelay: 800,
     useProseMirrorLive: false,
+    useCodeMirrorSource: false,
+    showScrollbar: true,
     ...overrides,
   };
 }

@@ -44,6 +44,16 @@ import {
   ListTree,
   PanelLeft,
   PanelRight,
+  RefreshCw,
+  Undo2,
+  Redo2,
+  Scissors,
+  Copy,
+  ClipboardPaste,
+  Type,
+  FolderPlus,
+  Trash2,
+  Pencil,
 } from "lucide-react";
 
 /**
@@ -145,6 +155,16 @@ export const Icons = {
   ListTree: ListTreeFramed,
   PanelLeft,
   PanelRight,
+  RefreshCw,
+  Undo2,
+  Redo2,
+  Scissors,
+  Copy,
+  ClipboardPaste,
+  Type,
+  FolderPlus,
+  Trash2,
+  Pencil,
 } as const;
 
 export type IconName = keyof typeof Icons;

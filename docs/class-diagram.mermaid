@@ -1,109 +1,104 @@
 classDiagram
-    class FileNode {
-        +string id
-        +string name
-        +string path
-        +boolean isDir
-        +FileNode[] children
-        +number depth
-    }
+    direction LR
+
     class EditorTab {
-        +string id
-        +string path
-        +string name
-        +string content
-        +string savedContent
-        +boolean dirty
-        +Cursor cursor
+        +id: string
+        +path: string
+        +name: string
+        +content: string
+        +savedContent: string
+        +dirty: boolean
+        +diskSignature: DiskSignature|null
+        +cursor: Cursor
     }
-    class Cursor {
-        +number line
-        +number col
+
+    class DiskSignature {
+        +mtimeMs: number
+        +size: number
+        +hash: string
     }
-    class AppConfig {
-        +string theme
-        +string fontFamily
-        +number fontSize
-        +ViewMode defaultView
-        +boolean sidebarVisible
-        +string lastFolder
-        +string[] recentFiles
-        +WindowSize window
-        +boolean autoSave
-        +number autoSaveDelay
+
+    class FileMeta {
+        +exists: boolean
+        +mtimeMs: number
+        +size: number
     }
-    class WindowSize {
-        +number width
-        +number height
-        +boolean maximized
+
+    class ConflictState {
+        +hasConflict: boolean
+        +diskContent: string
+        +diskSignature: DiskSignature
     }
-    class ViewMode {
-        <<enum>>
-        edit
-        split
-        preview
+
+    class ConflictViewModel {
+        +tabId: string
+        +name: string
+        +path: string
+        +diskContent: string
+        +memoryContent: string
+        +diskMtimeMs: number
+        +memoryDirty: boolean
     }
-    class FormatCommand {
-        <<enum>>
-        h1
-        h2
-        h3
-        bold
-        italic
-        strike
-        code
-        ul
-        ol
-        task
-        quote
-        link
-        image
-        table
+
+    class ConflictDetector {
+        +captureDiskState(tab): Promise~void~
+        +detectConflict(tab): Promise~ConflictState~
     }
-    class useTabsStore {
-        -EditorTab[] tabs
-        -string activeId
-        +openTab(file) void
-        +closeTab(id) void
-        +updateContent(id, value) void
-        +saveActive() void
-        +isAnyDirty() boolean
+
+    class RefreshGuard {
+        +guardRefresh(): Promise~void~
     }
-    class useUIStore {
-        -ViewMode viewMode
-        -boolean sidebarVisible
-        -string currentFolder
-        -FileNode[] tree
-        -boolean searchOpen
-        +setViewMode(m) void
-        +toggleSidebar() void
-        +setFolder(p, tree) void
+
+    class UnsavedDialog {
+        +confirmClose(conflict: boolean): Promise~CloseDecision~
+        +confirmRefresh(): Promise~RefreshDecision~
     }
-    class useConfigStore {
-        -AppConfig config
-        +load() void
-        +save() void
-        +update(patch) void
+
+    class ConflictResolvePage {
+        +onUseDisk()
+        +onKeepMine()
+        +onCancel()
     }
-    class fsCommands {
-        +openFolderDialog() string
-        +openFileDialog() string
-        +buildTree(path) FileNode[]
-        +readFileText(path) string
-        +writeFileText(path, c) void
+
+    class UseTabsStore {
+        +reloadFromDisk(path): Promise~void~
+        +reloadActiveFromDisk(): Promise~void~
+        +setDiskSignature(id, sig)
+        +saveActive(): Promise~void~
+        +isAnyDirty(): boolean
     }
-    class markdown {
-        +render(md) string
+
+    class UseUIStore {
+        +conflictView: ConflictViewModel|null
+        +openConflictView(model)
+        +closeConflictView()
     }
-    class formatText {
-        +apply(command, text, sel) string
+
+    class Toolbar {
+        +onRefreshClick()
     }
-    EditorTab "1" *-- "1" Cursor : has
-    AppConfig "1" *-- "1" WindowSize : has
-    FileNode ..> useUIStore : storedIn
-    EditorTab ..> useTabsStore : managedBy
-    useTabsStore ..> fsCommands : saveVia
-    useUIStore ..> fsCommands : buildTreeVia
-    useConfigStore ..> fsCommands : persistVia
-    markdown ..> highlight : uses
-    formatText ..> EditorTab : mutateContent
+
+    class App {
+        +registerHotkeys(Ctrl+R, F5)
+    }
+
+    class CloseGuard {
+        +registerCloseGuard(isDirty)
+        +requestCloseTab(id)
+    }
+
+    EditorTab *-- DiskSignature : 嵌入基线
+    ConflictState ..> DiskSignature : 包含
+    ConflictDetector ..> EditorTab : 读取/比对
+    ConflictDetector ..> FileMeta : stat()
+    ConflictDetector ..> ConflictState : 返回
+    RefreshGuard ..> UseTabsStore : reloadFromDisk
+    RefreshGuard ..> UnsavedDialog : confirmRefresh
+    UnsavedDialog ..> UseUIStore : 渲染
+    ConflictResolvePage ..> UseUIStore : 读 conflictView
+    ConflictResolvePage ..> UseTabsStore : reloadFromDisk/saveActive
+    Toolbar ..> RefreshGuard : guardRefresh
+    App ..> RefreshGuard : guardRefresh(Ctrl+R/F5)
+    CloseGuard ..> UnsavedDialog : confirmClose
+    CloseGuard ..> ConflictDetector : detectConflict
+    CloseGuard ..> UseUIStore : openConflictView

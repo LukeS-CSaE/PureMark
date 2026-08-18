@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import { useUIStore } from "../../store/useUIStore";
 import { useTabsStore } from "../../store/useTabsStore";
-import { readFileText } from "../../commands/fsCommands";
+import { readFileTextWithEncoding } from "../../commands/fsCommands";
 import { openInFocusedPane } from "../../lib/paneRouter";
+import { buildFileMenu } from "../../lib/fileContextMenu";
 import type { FileNode } from "../../types";
 import Icon from "../ui/Icon";
 
@@ -15,12 +16,26 @@ export default function FileTree() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   async function handleOpenFile(node: FileNode) {
-    const content = await readFileText(node.path);
-    openInFocusedPane({ path: node.path, name: node.name, content });
+    // 编码自动检测（UTF-8 / GBK / GB2312 / Big5 / UTF-16），保存时按原编码写回。
+    const { content, encoding, hadBom } = await readFileTextWithEncoding(node.path);
+    openInFocusedPane({ path: node.path, name: node.name, content, encoding, hadBom });
   }
 
   function toggleDir(id: string) {
     setExpanded((m) => ({ ...m, [id]: !m[id] }));
+  }
+
+  // 需求2：文件树节点右键 → 自定义菜单（写操作经 fileOps 真实调用 Rust 命令）
+  function onNodeContextMenu(e: MouseEvent, node: FileNode): void {
+    e.preventDefault();
+    e.stopPropagation();
+    useUIStore.getState().openContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      scope: "file",
+      items: buildFileMenu(node),
+      payload: { path: node.path, isDir: node.isDir },
+    });
   }
 
   if (tree.length === 0) {
@@ -41,6 +56,7 @@ export default function FileTree() {
               className="file-item"
               style={{ paddingLeft: 0 + node.depth * 14 }}
               onClick={() => toggleDir(node.id)}
+              onContextMenu={(e) => onNodeContextMenu(e, node)}
             >
               <Icon name={isOpen ? "ChevronDown" : "ChevronRight"} size={14} />
               <span className="flex-1 truncate text-[13px]">{node.name}</span>
@@ -56,6 +72,7 @@ export default function FileTree() {
           className={`file-item${active ? " active" : ""}`}
           style={{ paddingLeft: 10 + node.depth * 14 + 16 }}
           onClick={() => void handleOpenFile(node)}
+          onContextMenu={(e) => onNodeContextMenu(e, node)}
         >
           <Icon name="FileText" size={15} />
           <span className="flex-1 truncate text-[13px]">{node.name}</span>
@@ -63,5 +80,5 @@ export default function FileTree() {
       );
     });
 
-  return <div>{renderNodes(tree)}</div>;
+  return <div className="file-tree">{renderNodes(tree)}</div>;
 }

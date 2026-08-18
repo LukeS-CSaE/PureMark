@@ -14,8 +14,8 @@ import {
 } from "@tauri-apps/api/window";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { LogicalSize } from "@tauri-apps/api/dpi";
-import { ask } from "@tauri-apps/plugin-dialog";
 import { load, type Store } from "@tauri-apps/plugin-store";
+import { guardWindowClose } from "./closeGuard";
 import type { WindowGeometry } from "../types";
 import {
   WINDOW_DEFAULT,
@@ -74,6 +74,23 @@ export async function toggleMaximizeWindow(): Promise<void> {
 
 export async function closeWindow(): Promise<void> {
   await getCurrentWindow().close();
+}
+
+/**
+ * Bring the main window to the front and give it focus. Used when a second
+ * instance forwards a `open-file` event (file association double-click) — the
+ * already-running app must surface itself instead of staying behind other
+ * windows or minimized in the taskbar.
+ *
+ * Order matters on Windows: `unminimize` restores a minimized window, `show`
+ * ensures it is visible, `setFocus` raises it. The Tauri 2 Window API exposes
+ * all three; calling them together is safe even when already focused/shown.
+ */
+export async function focusWindow(): Promise<void> {
+  const win = getCurrentWindow();
+  await win.unminimize();
+  await win.show();
+  await win.setFocus();
 }
 
 // ---------------------------------------------------------------------------
@@ -254,11 +271,9 @@ export async function registerCloseGuard(
     await persistWindowStateOnClose();
     if (isDirty()) {
       event.preventDefault();
-      const confirmed = await ask("有未保存的修改，确定要退出吗？", {
-        title: "PureMark",
-        kind: "warning",
-      });
-      if (confirmed) {
+      // 升级为「先检测冲突 → 自定义弹窗 → 决策」（设计 T04 / 方案 A+B）
+      const proceed = await guardWindowClose();
+      if (proceed) {
         await getCurrentWindow().destroy();
       }
     }

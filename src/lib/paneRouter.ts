@@ -23,6 +23,10 @@ export interface OpenFileInput {
   path: string;
   name: string;
   content: string;
+  /** 文件原始编码（非 UTF-8 中文文档由读取层检测，保存时按原编码写回）。 */
+  encoding?: string;
+  /** 原文件是否带 BOM。 */
+  hadBom?: boolean;
 }
 
 /** Mirror the focused pane's document into `useTabsStore.activeId`. */

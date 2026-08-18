@@ -63,6 +63,25 @@ describe("matchHotkey", () => {
   });
 });
 
+describe("matchHotkey — modifier-less combos (F5)", () => {
+  it("matches F5 with no modifier pressed", () => {
+    const cb = vi.fn();
+    expect(matchHotkey({ "F5": cb }, mockKeyEvent("F5"))).toBe(cb);
+  });
+
+  it("matches Ctrl+F5 as well (so the native hard-reload is intercepted)", () => {
+    // 设计 D2：F5/Ctrl+R 不放行。无修饰键组合在按下修饰键时也匹配，
+    // 确保 Ctrl+F5 同样被拦截。
+    const cb = vi.fn();
+    expect(matchHotkey({ "F5": cb }, mockKeyEvent("F5", true, false))).toBe(cb);
+  });
+
+  it("does not match a modifier-less combo when another key is pressed", () => {
+    const cb = vi.fn();
+    expect(matchHotkey({ "F5": cb }, mockKeyEvent("f"))).toBeNull();
+  });
+});
+
 describe("createHotkeyHandler", () => {
   it("calls preventDefault and the matched callback on a hit", () => {
     const cb = vi.fn();
@@ -89,6 +108,15 @@ describe("createHotkeyHandler", () => {
     handler(e);
     expect(cb).not.toHaveBeenCalled();
     expect(e.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("intercepts F5 (preventDefault + callback) like a normal hotkey", () => {
+    const cb = vi.fn();
+    const handler = createHotkeyHandler({ "F5": cb });
+    const e = mockKeyEvent("F5");
+    handler(e);
+    expect(cb).toHaveBeenCalledOnce();
+    expect(e.preventDefault).toHaveBeenCalledOnce();
   });
 
   it("calls each registered callback exactly once per keypress", () => {

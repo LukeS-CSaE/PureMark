@@ -18,7 +18,7 @@ export interface TocListProps {
  */
 export default function TocList({ items, onJump }: TocListProps) {
   if (items.length === 0) {
-    return <div className="toc-empty">本文档暂无标题</div>;
+    return <div className="toc-empty"> </div>;
   }
 
   return (

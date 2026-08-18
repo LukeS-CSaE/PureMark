@@ -21,10 +21,11 @@ import { tags } from "@lezer/highlight";
  *
  * The "paper" padding is NOT set here on purpose — it lives in `live.css`
  * (`.cm-content`, shared by both `edit` and `live` CodeMirror modes) and in
- * `preview.css` (`.preview-content`), all driven by the same `--editor-pad-*`
- * tokens. Keeping it in CSS gives a single source of truth for the three
- * editor-card views and makes the margin apply even before the JS theme is
- * injected. This theme layer therefore only carries font metrics, as the
+ * `pm.css` (`.pm-live` / `.pm-editor`, used by the TipTap live AND preview
+ * views since preview was unified onto the same engine), all driven by the
+ * same `--editor-pad-*` tokens. Keeping it in CSS gives a single source of
+ * truth for the editor-card views and makes the margin apply even before the
+ * JS theme is injected. This theme layer therefore only carries font metrics, as the
  * design intends.
  */
 export function fontTheme(fontFamily: string, fontSize: number): Extension {

@@ -1,0 +1,106 @@
+classDiagram
+    direction LR
+
+    class MenuItem {
+        +id: string
+        +label: string
+        +icon: IconName|null
+        +shortcut: string|null
+        +disabled: boolean
+        +separator: boolean
+        +submenu: MenuItem[]|null
+        +run(): void
+    }
+
+    class ContextMenuState {
+        +x: number
+        +y: number
+        +items: MenuItem[]
+        +scope: 'editor'|'file'|'tab'
+        +payload: object|null
+    }
+
+    class ContextMenu {
+        +render()
+        +positionWithFlip()
+        +onClose()
+    }
+
+    class UseUIStore {
+        +contextMenu: ContextMenuState|null
+        +openContextMenu(state)
+        +closeContextMenu()
+    }
+
+    class UseTabsStore {
+        +closeTab(id)
+        +closeOthers(id)
+        +closeRight(id)
+        +closeLeft(id)
+        +closeAll()
+    }
+
+    class EditorHandle {
+        +getValue(): string
+        +getSelection(): {start,end}
+        +replaceRange(from,to,insert,select?)
+        +focus()
+    }
+
+    class CmCommands {
+        +undo(view)
+        +redo(view)
+        +cut(view)
+        +copy(view)
+        +paste(view)
+        +selectAll(view)
+        +formatCommand(name): Command
+    }
+
+    class FileOps {
+        +renameFile(path, newName)
+        +deleteFile(path)
+        +createFile(dir, name)
+        +createDir(dir, name)
+        +revealInExplorer(path)
+        +copyPath(path)
+    }
+
+    class RustCommands {
+        +rename_file(path, newName)
+        +delete_file(path)
+        +create_file(dir, name)
+        +create_dir(dir, name)
+        +reveal_in_explorer(path)
+    }
+
+    class CodeEditor {
+        +domEventHandlers(contextmenu)
+    }
+
+    class FileTree {
+        +onContextMenu(node)
+    }
+
+    class TabBar {
+        +onContextMenu(tab)
+    }
+
+    class ContextMenuGuard {
+        +shouldSuppressContextMenu(target)
+    }
+
+    MenuItem "0..*" --* ContextMenuState : items
+    ContextMenu ..> ContextMenuState : 读取
+    ContextMenu ..> UseUIStore : 受控
+    UseUIStore ..> ContextMenu : 驱动渲染
+    CodeEditor ..> UseUIStore : openContextMenu(editor)
+    FileTree ..> UseUIStore : openContextMenu(file)
+    TabBar ..> UseUIStore : openContextMenu(tab)
+    ContextMenuGuard ..> ContextMenu : 不接管输入/按钮(EXEMPT)
+    CodeEditor ..> CmCommands : 命令
+    CmCommands ..> EditorHandle : 操作视图
+    FileTree ..> FileOps : 写操作
+    FileOps ..> RustCommands : invoke
+    RustCommands ..> UseTabsStore : 刷新/树重建
+    UseTabsStore ..> UseUIStore : setFolder(重建树)

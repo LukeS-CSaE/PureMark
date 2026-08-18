@@ -6,7 +6,8 @@
  * `renderToStaticMarkup`. That is enough to assert *structure*:
  *
  *   • which child component a pane resolves to (`.code-editor` vs
- *     `.preview-content`);
+ *     `data-view="preview"` — preview now shares the TipTap `.pm-live`
+ *     surface with the live view, so it is told apart by a data attribute);
  *   • how many `.editor-split` columns a split layout produces and what width
  *     each one gets from `splitRatio`;
  *   • which ViewSwitcher segment is marked `aria-pressed`.
@@ -38,7 +39,9 @@ vi.mock("../lib/tauri", () => ({
 
 vi.mock("../commands/fsCommands", () => ({
   readFileText: vi.fn(async () => ""),
+  readFileTextWithEncoding: vi.fn(async () => ({ content: "", encoding: "utf-8", hadBom: false })),
   writeFileText: vi.fn(async () => undefined),
+  writeFileTextWithEncoding: vi.fn(async () => undefined),
   openFileDialog: vi.fn(async () => null),
   openFolderDialog: vi.fn(async () => null),
   saveFileDialog: vi.fn(async () => null),
@@ -113,16 +116,24 @@ beforeEach(() => {
 /* ------------------------------------------------------------------------ */
 
 describe("EditorCard — single layout", () => {
+  // 统一视图重构后：preview / live 均为 MarkdownView（ProseMirror）；edit 在
+  // CM 关闭（默认）时合并进 live（同样 MarkdownView）。data-view 标记：
+  // preview→"preview"，可编辑→"live"。仅开启 useCodeMirrorSource 后 edit 才
+  // 独立渲染 CodeEditor（data-view="edit"，class="code-editor"）。
   it.each([
-    ["edit" as const, 1, 0],
-    ["live" as const, 1, 0],
-    ["preview" as const, 0, 1],
-  ])("viewMode %s renders %i CodeEditor / %i PreviewPane", (mode, editors, previews) => {
-    setPanes("single", [makePane("A", mode)]);
-    const html = renderToStaticMarkup(createElement(EditorCard));
-    expect(count(html, 'class="code-editor"')).toBe(editors);
-    expect(count(html, "preview-content")).toBe(previews);
-  });
+    ["edit" as const, 0, 0, 1],
+    ["live" as const, 0, 0, 1],
+    ["preview" as const, 0, 1, 0],
+  ])(
+    "viewMode %s renders %i CodeEditor / %i preview / %i live",
+    (mode, editors, previews, lives) => {
+      setPanes("single", [makePane("A", mode)]);
+      const html = renderToStaticMarkup(createElement(EditorCard));
+      expect(count(html, 'class="code-editor"')).toBe(editors);
+      expect(count(html, 'data-view="preview"')).toBe(previews);
+      expect(count(html, 'data-view="live"')).toBe(lives);
+    },
+  );
 
   it("emits no split columns and keeps the toolbar above the pane", () => {
     const html = renderToStaticMarkup(createElement(EditorCard));
@@ -140,25 +151,26 @@ describe("EditorCard — split layout", () => {
     expect(count(html, 'class="editor-split"')).toBe(2);
   });
 
-  it("renders both panes' components at once, left pane first", () => {
+  it("renders both panes' components at once, left pane first (edit merges to live)", () => {
     setPanes("split", [makePane("A", "edit"), makePane("B", "preview")]);
     const html = renderToStaticMarkup(createElement(EditorCard));
-    expect(count(html, 'class="code-editor"')).toBe(1);
-    expect(count(html, "preview-content")).toBe(1);
-    expect(html.indexOf("code-editor")).toBeLessThan(html.indexOf("preview-content"));
+    expect(count(html, 'class="code-editor"')).toBe(0);
+    expect(count(html, 'data-view="live"')).toBe(1);
+    expect(count(html, 'data-view="preview"')).toBe(1);
+    expect(html.indexOf('data-view="live"')).toBeLessThan(html.indexOf('data-view="preview"'));
   });
 
-  it("renders two editors when both panes are editable", () => {
+  it("renders two editable views when both panes are editable (live/live)", () => {
     setPanes("split", [makePane("A", "edit"), makePane("B", "live")]);
     const html = renderToStaticMarkup(createElement(EditorCard));
-    expect(count(html, 'class="code-editor"')).toBe(2);
-    expect(count(html, "preview-content")).toBe(0);
+    expect(count(html, 'data-view="live"')).toBe(2);
+    expect(count(html, 'data-view="preview"')).toBe(0);
   });
 
   it("renders two previews when both panes are in preview", () => {
     setPanes("split", [makePane("A", "preview"), makePane("B", "preview")]);
     const html = renderToStaticMarkup(createElement(EditorCard));
-    expect(count(html, "preview-content")).toBe(2);
+    expect(count(html, 'data-view="preview"')).toBe(2);
     expect(count(html, 'class="code-editor"')).toBe(0);
   });
 
@@ -202,39 +214,33 @@ describe("EditorCard — split layout", () => {
     setPanes("split", [makePane("A", "edit")]);
     const html = renderToStaticMarkup(createElement(EditorCard));
     expect(count(html, 'class="editor-split"')).toBe(2);
-    expect(count(html, 'class="code-editor"')).toBe(1);
+    // edit 合并进 live（CM 关闭）→ 一个可编辑 MarkdownView。
+    expect(count(html, 'data-view="live"')).toBe(1);
   });
 });
 
 describe("ViewSwitcher — rendered segments", () => {
-  it("renders the split toggle plus one button per view mode", () => {
+  // 默认 useCodeMirrorSource=false → 仅「实时 / 预览」两个视图段（编辑合并进 live）。
+  it("renders one button per enabled view mode (edit hidden unless CM source on)", () => {
     const html = renderToStaticMarkup(createElement(ViewSwitcher));
-    expect(count(html, "<button")).toBe(4);
-    expect(html).toContain('aria-label="编辑"');
+    expect(count(html, "<button")).toBe(2);
+    expect(html).not.toContain('aria-label="编辑"');
     expect(html).toContain('aria-label="实时"');
     expect(html).toContain('aria-label="预览"');
-    expect(html).toContain('aria-label="分屏"');
   });
 
   it("marks the focused pane's mode as pressed", () => {
     setPanes("single", [makePane("A", "preview")]);
     const html = renderToStaticMarkup(createElement(ViewSwitcher));
     expect(html).toMatch(/aria-label="预览"[^>]*aria-pressed="true"/);
-    expect(html).toMatch(/aria-label="编辑"[^>]*aria-pressed="false"/);
     expect(html).toMatch(/aria-label="实时"[^>]*aria-pressed="false"/);
   });
 
   it("follows the focused pane, not pane A, in a split layout", () => {
     setPanes("split", [makePane("A", "edit"), makePane("B", "preview")], "B");
     const html = renderToStaticMarkup(createElement(ViewSwitcher));
+    // edit 在 CM 关闭时映射为高亮的 live。
     expect(html).toMatch(/aria-label="预览"[^>]*aria-pressed="true"/);
-    expect(html).toMatch(/aria-label="编辑"[^>]*aria-pressed="false"/);
-  });
-
-  it("shows the split toggle as pressed and relabelled while split", () => {
-    setPanes("split", [makePane("A", "edit"), makePane("B", "preview")]);
-    const html = renderToStaticMarkup(createElement(ViewSwitcher));
-    expect(html).toMatch(/aria-label="退出分屏"[^>]*aria-pressed="true"/);
-    expect(html).toContain("segment active");
+    expect(html).toMatch(/aria-label="实时"[^>]*aria-pressed="false"/);
   });
 });

@@ -1,38 +1,28 @@
 import { useTabsStore } from "../../store/useTabsStore";
 import { useEditorStats } from "../../hooks/useEditorStats";
-import { useConfigStore } from "../../store/useConfigStore";
-import { useUIStore } from "../../store/useUIStore";
-import type { TocPosition } from "../../types";
-import Icon from "../ui/Icon";
 
-/** 34px status bar: cursor position + document stats + TOC controls + encoding. */
+/** 编码标签 → 状态栏显示名（gb18030 兼容 GBK/GB2312，统一显示为 GBK）。 */
+function encodingLabel(encoding: string | undefined, hadBom: boolean | undefined): string {
+  const base =
+    encoding === "gb18030" || encoding === "gbk" || encoding === "gb2312"
+      ? "GBK"
+      : encoding === "big5"
+        ? "Big5"
+        : encoding === "utf-16le"
+          ? "UTF-16 LE"
+          : encoding === "utf-16be"
+            ? "UTF-16 BE"
+            : "UTF-8";
+  return hadBom && (base === "UTF-8" || base.startsWith("UTF-16")) ? `${base} with BOM` : base;
+}
+
+/** 34px status bar: cursor position + document stats + 当前文档编码。 */
 export default function StatusBar() {
   const active = useTabsStore((s) => s.tabs.find((t) => t.id === s.activeId) ?? null);
   const stats = useEditorStats(
     active?.content ?? "",
     active?.cursor ?? { line: 1, col: 1 },
   );
-
-  const tocVisible = useConfigStore((s) => s.config.tocVisible);
-  const tocPosition = useConfigStore((s) => s.config.tocPosition);
-
-  function handleToggleToc() {
-    const next = !tocVisible;
-    useConfigStore.getState().update({ tocVisible: next });
-    if (tocPosition === "left") {
-      useUIStore.getState().setSidebarMode(next ? "toc" : "files");
-    }
-  }
-
-  function handleToggleTocPosition() {
-    const nextPos: TocPosition = tocPosition === "left" ? "right" : "left";
-    useConfigStore.getState().update({ tocPosition: nextPos });
-    if (nextPos === "right") {
-      useUIStore.getState().setSidebarMode("files");
-    } else if (useConfigStore.getState().config.tocVisible) {
-      useUIStore.getState().setSidebarMode("toc");
-    }
-  }
 
   return (
     <footer className="app-statusbar">
@@ -42,31 +32,9 @@ export default function StatusBar() {
         <span>{stats.chars} charts</span>
       </div>
 
-      <div className="status-item status-right">
-        <div className="segment-group toc-controls" role="group" aria-label="目录控制">
-          <button
-            type="button"
-            className={`segment${tocVisible ? " active" : ""}`}
-            title={tocVisible ? "隐藏目录" : "显示目录"}
-            aria-pressed={tocVisible}
-            onClick={handleToggleToc}
-          >
-            目录
-          </button>
-          {tocVisible && (
-            <button
-              type="button"
-              className="segment"
-              title={tocPosition === "left" ? "目录移到右侧" : "目录移到左侧"}
-              aria-label={tocPosition === "left" ? "目录移到右侧" : "目录移到左侧"}
-              onClick={handleToggleTocPosition}
-            >
-              <Icon name={tocPosition === "left" ? "PanelRight" : "PanelLeft"} size={14} />
-            </button>
-          )}
-        </div>
-
-        <span>UTF-8</span>
+      {/* 右侧：当前文档的编码（非 UTF-8 中文文档自动检测得出）+ 类型。 */}
+      <div className="status-item">
+        <span>{encodingLabel(active?.encoding, active?.hadBom)}</span>
         <span>Markdown</span>
       </div>
     </footer>

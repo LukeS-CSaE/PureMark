@@ -1,27 +1,18 @@
 /**
- * CodeMirror 6 host component (design §1.1, task T02 step 2.10).
+ * CodeMirror 6 源码编辑器宿主（统一视图重构，2026-08）。
  *
- * Replaces the MVP `EditorPane.tsx` (a single controlled `<textarea>`), whose
- * "one global editor" assumption cannot survive two simultaneously mounted
- * panes.
+ * 作为「编辑」视图在 `useCodeMirrorSource` 开启时呈现；与 live / preview
+ * （统一 ProseMirror 渲染核心）共享同一套外壳令牌（--editor-pad-* / 滚动容器
+ * 模型 / 卡片底色 / 设计令牌），保证三视图布局与样式统一；其内容为原始
+ * markdown 文本（等宽字体），这是「编辑」视图的固有语义。
  *
- * Lifecycle contract:
- *   • the `EditorView` is created **once** and destroyed only on unmount;
- *     font, theme, live mode and editability are swapped through compartments
- *     (design §8.1 — never rebuild the view to change configuration);
- *   • `viewMode === 'live'` additionally toggles the `.cm-live` class on the
- *     CodeMirror root, which is what `live.css` keys its block-level
- *     typography off (`.cm-md-block-*` rules);
- *   • switching documents snapshots the outgoing scroll offset and restores the
- *     incoming one (design §8.2);
- *   • the caret is reported to `usePanesStore.setPaneCursor` only — writing
- *     `useTabsStore.setCursor` is forbidden because two panes can share a
- *     buffer while having different carets (R-10).
- *
- * 行级重写为 line-decoration 方案后, 不再有 widget / click 坐标错位 bug,
- * 因此删除了旧版的 `.cm-live` 自愈补丁 (约 60 行防御代码). `.cm-live` 类
- * 现在只在 `viewMode` 变化时 toggle 一次, 由 `livePreviewPlugin` 的
- * `LineDecoration` 驱动块级样式, 不再需要每帧重盖.
+ * 生命周期契约（与原实现一致，仅去掉已废弃的 CM live 装饰路径）：
+ *   • `EditorView` 只创建一次，字体 / 主题 / 可编辑性通过 Compartment 切换，
+ *     绝不为改配置而重建视图（设计 §8.1）；
+ *   • 文档切换时快照 / 恢复滚动偏移（设计 §8.2）；
+ *   • 通过 `useDocSync` 注册 EditorHandle，并接 ①②③ 三路同步（写回 / 回填 /
+ *     同文件分屏 peer 转发），使保存、脏标记、分屏与 ProseMirror 路径一致；
+ *   • 注册滚动容器（kind=editor），支撑 split 下 编辑↔预览 的同步滚动。
  */
 import { useEffect, useRef, useState } from "react";
 import { EditorView, type ViewUpdate } from "@codemirror/view";
@@ -38,19 +29,16 @@ import {
   darkCompartment,
   editableCompartment,
   fontCompartment,
-  liveCompartment,
   reconfigure,
   syncAnnotation,
 } from "../../lib/cm/setup";
 import { fontTheme } from "../../lib/cm/cmTheme";
-import { livePreviewPlugin } from "../../lib/cm/livePreview";
+import { buildEditorMenu } from "../../lib/editorContextMenu";
 
 export interface CodeEditorProps {
   paneId: PaneId;
   /** Document to display, or `null` for the empty state. */
   tabId: string | null;
-  /** Only the two editable modes reach this component; `preview` uses `PreviewPane`. */
-  viewMode: "edit" | "live";
 }
 
 /** Read a tab's current content without subscribing to the store. */
@@ -59,7 +47,7 @@ function readContent(tabId: string | null): string {
   return useTabsStore.getState().tabs.find((tab) => tab.id === tabId)?.content ?? "";
 }
 
-export default function CodeEditor({ paneId, tabId, viewMode }: CodeEditorProps) {
+export default function CodeEditor({ paneId, tabId }: CodeEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const [view, setView] = useState<EditorView | null>(null);
@@ -74,12 +62,6 @@ export default function CodeEditor({ paneId, tabId, viewMode }: CodeEditorProps)
   const scrollByTab = useRef<Map<string, number>>(new Map());
   const mountedTabRef = useRef<string | null>(null);
   const updateHandlerRef = useRef<(update: ViewUpdate) => void>(() => {});
-  /**
-   * Tracks the last live-mode flag the editor root was actually stamped with,
-   * so the live-mode effect below can short-circuit no-op re-runs (e.g. when
-   * a parent `setPaneCursor` re-renders the pane).
-   */
-  const liveActiveRef = useRef<boolean | null>(null);
 
   // Keep the update handler fresh without recreating the view.
   useEffect(() => {
@@ -102,10 +84,6 @@ export default function CodeEditor({ paneId, tabId, viewMode }: CodeEditorProps)
     const config = useConfigStore.getState().config;
     const panes = usePanesStore.getState();
     const initialTabId = panes.getPane(paneId)?.tabId ?? null;
-    // 以 props.viewMode 为准，避免 pane store 与 props 不同步导致 live
-    // 插件初始状态错误.
-    const liveOnMount = viewMode === "live";
-    console.log("[CodeEditor] mount paneId", paneId, "viewMode", viewMode, "liveOnMount", liveOnMount);
 
     const state = createEditorState({
       doc: readContent(initialTabId),
@@ -113,15 +91,13 @@ export default function CodeEditor({ paneId, tabId, viewMode }: CodeEditorProps)
       fontSize: config.fontSize,
       dark: useUIStore.getState().resolvedTheme === "dark",
       editable: true,
-      liveExtension: liveOnMount ? livePreviewPlugin : [],
+      // 统一重构后 CM 仅作源码编辑器，不再承载 live 装饰路径。
+      liveExtension: [],
       onUpdate: (update) => updateHandlerRef.current(update),
+      extraExtensions: [],
     });
 
     const instance = new EditorView({ state, parent: host });
-    // Stamp the `.cm-live` container class on mount so the first paint already
-    // has the parent selector matched for `.cm-md-block-*` rules in `live.css`.
-    instance.dom.classList.toggle("cm-live", liveOnMount);
-    liveActiveRef.current = liveOnMount;
     mountedTabRef.current = initialTabId;
     viewRef.current = instance;
     setView(instance);
@@ -150,28 +126,7 @@ export default function CodeEditor({ paneId, tabId, viewMode }: CodeEditorProps)
     reconfigure(instance, darkCompartment, EditorView.darkTheme.of(isDark));
   }, [view, isDark]);
 
-  // ---- live decorations + `.cm-live` container class ------------------------
-  // IMPORTANT: depend on `viewMode` ONLY. Including `view` in the deps
-  // causes the effect to re-run on every setView round trip during
-  // mount/cleanup, which calls `reconfigure` again and forces CodeMirror to
-  // rebuild the live plugin.
-  useEffect(() => {
-    const instance = viewRef.current;
-    if (!instance) return;
-    const live = viewMode === "live";
-    console.log("[CodeEditor] viewMode effect", "current", liveActiveRef.current, "target", live);
-    if (liveActiveRef.current === live) return;
-    liveActiveRef.current = live;
-    reconfigure(instance, liveCompartment, live ? livePreviewPlugin : []);
-    instance.dom.classList.toggle("cm-live", live);
-    console.log("[CodeEditor] reconfigured live", live, "classList has cm-live", instance.dom.classList.contains("cm-live"));
-  }, [viewMode]);
-
-  // ---- editability ----------------------------------------------------------
-  // Both `edit` and `live` are always editable, even when no document is open
-  // (mirrors the ProseMirror live view). Edits made with no file open are not
-  // written back to the tab store — they live in the editor instance only,
-  // exactly like the live view.
+  // ---- editability (always editable) ---------------------------------------
   useEffect(() => {
     const instance = viewRef.current;
     if (!instance) return;
@@ -200,7 +155,6 @@ export default function CodeEditor({ paneId, tabId, viewMode }: CodeEditorProps)
 
     const restored = tabId ? (scrollByTab.current.get(tabId) ?? 0) : 0;
     usePanesStore.getState().setPaneScroll(paneId, restored);
-    // The new content must be laid out before the offset means anything.
     const raf =
       typeof requestAnimationFrame === "function"
         ? requestAnimationFrame(() => {
@@ -212,10 +166,7 @@ export default function CodeEditor({ paneId, tabId, viewMode }: CodeEditorProps)
     };
   }, [view, tabId, paneId]);
 
-  // ---- scroll sync registration (Bug #2) ------------------------------------
-  // `view.scrollDOM` only exists after the EditorView is created, so this
-  // effect runs on the view-changed transition. `getTabId` reads the live store
-  // so tab swaps inside the pane do not require re-registering.
+  // ---- scroll sync registration (split 编辑↔预览 同步) ----------------------
   useEffect(() => {
     if (!view) return;
     const unregister = registerScrollPane({
@@ -231,8 +182,26 @@ export default function CodeEditor({ paneId, tabId, viewMode }: CodeEditorProps)
     <div
       ref={hostRef}
       className="code-editor"
+      data-pane-id={paneId}
+      data-view="edit"
       onMouseDownCapture={() => focusPane(paneId)}
       onFocusCapture={() => focusPane(paneId)}
+      onContextMenu={(e: import("react").MouseEvent) => {
+        // 需求2：编辑视图自定义右键菜单。全局 guard 已在 capture 阶段
+        // preventDefault 压制原生菜单，这里在冒泡阶段打开自定义菜单。
+        e.preventDefault();
+        focusPane(paneId);
+        const v = viewRef.current;
+        if (!v) return;
+        const pane = usePanesStore.getState().getPane(paneId);
+        useUIStore.getState().openContextMenu({
+          x: e.clientX,
+          y: e.clientY,
+          scope: "editor",
+          items: buildEditorMenu(v),
+          payload: { tabId: pane?.tabId ?? undefined },
+        });
+      }}
     />
   );
 }

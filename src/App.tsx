@@ -10,22 +10,47 @@ import { useTheme } from "./hooks/useTheme";
 import { shouldSuppressContextMenu } from "./lib/contextMenuGuard";
 import { openInFocusedPane, newUntitledInFocusedPane } from "./lib/paneRouter";
 import { requestCloseTab } from "./lib/closeGuard";
+import { guardRefresh } from "./lib/refreshGuard";
+import { initFileWatchers } from "./lib/fileWatcher";
 import {
   registerCloseGuard,
   applyStartupGeometry,
   persistWindowState,
   listenWindowResize,
+  focusWindow,
 } from "./lib/tauri";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { readFileText } from "./commands/fsCommands";
+import { readFileTextWithEncoding, buildTree } from "./commands/fsCommands";
+import { dirOf } from "./lib/pathUtils";
 
-/** Open a file at an absolute path (used by file-association / "Open with"). */
-async function openPath(path: string) {
+/**
+ * Open a file launched via an external file association (double-click / "Open
+ * with" / single-instance forward). Opens the document in the focused pane and
+ * points the sidebar explorer at the file's containing folder so the directory
+ * is shown with the current file highlighted.
+ */
+async function openFileFromAssociation(path: string) {
   try {
-    const content = await readFileText(path);
+    // 编码自动检测（UTF-8 / GBK / GB2312 / Big5 / UTF-16），保存时按原编码写回。
+    const { content, encoding, hadBom } = await readFileTextWithEncoding(path);
     const name = path.split(/[\\/]/).pop() ?? path;
-    openInFocusedPane({ path, name, content });
+    openInFocusedPane({ path, name, content, encoding, hadBom });
+
+    // Feature: show the current file's folder in the explorer. Build the tree
+    // for the parent directory; the file itself is highlighted automatically
+    // because FileTree matches node.path against the active tab path.
+    const folder = dirOf(path);
+    try {
+      const tree = await buildTree(folder);
+      useUIStore.getState().setFolder(folder, tree);
+      useConfigStore.getState().update({ lastFolder: folder });
+      // Force the explorer visible for THIS launch only (not persisted) so the
+      // folder is actually displayed — overriding the stored sidebar preference.
+      useUIStore.getState().setSidebarVisible(true);
+    } catch (treeErr) {
+      console.error("Failed to build folder tree for launched file:", treeErr);
+    }
   } catch (err) {
     console.error("Failed to open file from association:", err);
   }
@@ -83,11 +108,10 @@ export default function App() {
       }
       if (cancelled || !pending) return;
 
-      // N-06: collapse the sidebar for THIS SESSION ONLY. Deliberately not
-      // written to config — a later normal launch must honour the user's
-      // stored preference.
-      useUIStore.getState().setSidebarVisible(false);
-      await openPath(pending);
+      // Open the document and point the explorer at its folder. The sidebar is
+      // forced visible (session-only, not persisted) so the current file's
+      // directory is shown on this launch.
+      await openFileFromAssociation(pending);
     })();
     return () => {
       cancelled = true;
@@ -128,7 +152,16 @@ export default function App() {
     "Cmd+N": () => newUntitledInFocusedPane(),
     "Ctrl+F": () => useUIStore.getState().setSearchOpen(true),
     "Cmd+F": () => useUIStore.getState().setSearchOpen(true),
+    // 刷新（需求1）：拦截原生 Ctrl+R / F5，统一走刷新守卫（dev 也不放行）
+    "Ctrl+R": () => void guardRefresh(),
+    "Cmd+R": () => void guardRefresh(),
+    "F5": () => void guardRefresh(),
   });
+
+  // 方案 B：启动实时文件监视（外部改动提示条）
+  useEffect(() => {
+    initFileWatchers();
+  }, []);
   useAutoSave();
 
   // Suppress the browser's native context menu over the app's content
@@ -138,9 +171,10 @@ export default function App() {
   // / spell-check / native CM commands continue to work.
   useEffect(() => {
     function onContextMenu(e: MouseEvent): void {
+      // 仅 preventDefault 压制原生菜单；不调用 stopPropagation，以便编辑器 /
+      // 文件树 / 标签页的自定义右键菜单（bubble 阶段处理器）能正常触发（需求2）。
       if (shouldSuppressContextMenu(e.target)) {
         e.preventDefault();
-        e.stopPropagation();
       }
     }
     window.addEventListener("contextmenu", onContextMenu, { capture: true });
@@ -161,7 +195,11 @@ export default function App() {
     let disposed = false;
     void (async () => {
       const fn = await listen<string>("open-file", (e) => {
-        void openPath(e.payload);
+        void openFileFromAssociation(e.payload);
+        // Surface the already-running window (double-click a .md while the app
+        // is behind another window or minimized). The live instance is the
+        // foreground process, so this reliably raises the window on Windows.
+        void focusWindow();
       });
       if (disposed) {
         fn();

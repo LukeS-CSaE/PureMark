@@ -1,10 +1,23 @@
 /**
- * Right-click suppression for the main app surfaces (iter2-ext T05 / N-18).
+ * Suppression of the WebView native context menu across the whole app
+ * (iter2-ext T05 / N-18, 需求2 — "禁用 WebView 原生右键菜单").
  *
- * The user requirement is that the native browser context menu does not pop up
- * over the app's content surfaces — workspace, editor pane, file tree, preview
- * pane — but it MUST continue to work inside form controls (paste in inputs,
- * spell-check in textareas) and inside the CodeMirror editor.
+ * Strategy (v3): **suppress the native context menu everywhere — no exceptions.**
+ *
+ *   - Every right-click anywhere in the app is suppressed (preventDefault),
+ *     INCLUDING inside `<input>` / `<textarea>`. This is what 需求2 ("禁用
+ *     WebView 原生右键菜单") and Q2 ("输入框不需要自定义右键……仅禁用右键即可")
+ *     actually ask for: a consistent custom-menu-only experience. Text fields
+ *     lose the native menu, but Ctrl+V / Ctrl+A / Ctrl+C still work, so no
+ *     real capability is lost.
+ *   - This replaces the old allow-list (`.app-workspace`, `.editor-pane`,
+ *     `.file-tree`, `.pm-live`) and the v2 "exempt input/textarea" rule.
+ *   - CodeMirror's editor (`.cm-content` / `.cm-editor`) is suppressed here;
+ *     it raises its own custom menu via a React `onContextMenu` handler (which
+ *     also calls `preventDefault`), so the native menu never shows.
+ *   - The ProseMirror live view (`.pm-live` / `.ProseMirror`) is *contenteditable*
+ *     and suppressed as well (native menu disabled; custom live-view menu is
+ *     deferred per 需求2).
  *
  * The pure function `shouldSuppressContextMenu` is split out from the React
  * effect so it can be unit-tested without jsdom; the listener itself is
@@ -12,30 +25,49 @@
  * contextmenu handler (which would otherwise eat the event first).
  */
 
-const SUPPRESS_SELECTOR = ".app-workspace, .editor-pane, .file-tree, .preview-content";
-
 /**
- * Form controls and the CodeMirror host — the default right-click menu is
- * useful here (paste, spell-check, native CM commands).
+ * Optional allow-list of elements that keep the native context menu.
+ *
+ * Kept empty on purpose: per 需求2 / Q2 the native WebView context menu is
+ * disabled *everywhere*, including text inputs. If a future feature genuinely
+ * needs the native menu back on some element, list its selector here (e.g.
+ * `"input.special"`) — the guard below no-ops when this is empty.
  */
-const EXEMPT_SELECTOR =
-  "input, textarea, button, select, [contenteditable], .cm-content, .cm-editor";
+const EXEMPT_SELECTOR = "";
 
 /**
  * Whether a contextmenu event on `target` should be suppressed.
  *
- * Returns `true` when the right-click originated inside one of the app's
- * content surfaces. The caller should `preventDefault()` +
- * `stopPropagation()` to keep the browser's native menu from popping up.
+ * Returns `true` (suppress the native menu) for any resolvable `Element`
+ * target. The caller should `preventDefault()` (but not `stopPropagation`)
+ * so custom menus opened in the bubble phase (editor / file-tree / tabs /
+ * search results) still fire.
  *
- * Returns `false` for `null` targets, non-Element targets, and targets inside
- * the exempt list (form controls, CodeMirror host).
+ * Returns `false` (keep native) only when `target` is `null` or cannot be
+ * resolved to an `Element`. With `EXEMPT_SELECTOR` empty (default), no
+ * element keeps the native menu.
  */
 export function shouldSuppressContextMenu(target: EventTarget | null): boolean {
+  // Bail out for non-Element targets to avoid false positives.
   if (!target || typeof target !== "object") return false;
-  const el = target as { closest?: (sel: string) => Element | null };
-  if (typeof el.closest !== "function") return false;
-  // Exempt interactive elements first — the default menu is useful there.
-  if (el.closest(EXEMPT_SELECTOR)) return false;
-  return el.closest(SUPPRESS_SELECTOR) !== null;
+
+  let el: Element | null = null;
+  if (typeof (target as Element).closest === "function") {
+    el = target as Element;
+  } else {
+    // Robustness: a contextmenu target is normally an Element, but fall back
+    // to the first node in the composed path if needed.
+    const path = (target as { composedPath?: () => EventTarget[] }).composedPath?.();
+    const first = path?.[0];
+    if (first && typeof (first as Element).closest === "function") {
+      el = first as Element;
+    }
+  }
+  if (!el) return false;
+
+  // Suppress everywhere by default. EXEMPT_SELECTOR is intentionally empty
+  // (需求2 / Q2: 禁用 WebView 原生右键菜单，含 input/textarea). The guard
+  // avoids calling closest("") which would throw on an invalid empty selector.
+  if (EXEMPT_SELECTOR && el.closest(EXEMPT_SELECTOR)) return false;
+  return true;
 }

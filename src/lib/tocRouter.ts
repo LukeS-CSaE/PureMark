@@ -38,7 +38,7 @@ export function jumpToHeading(paneId: PaneId, item: TocItem): void {
   if (pane.viewMode === "preview") {
     focusPane(paneId);
     const rootEl = document.querySelector<HTMLElement>(
-      `[data-pane-id="${paneId}"].preview-content`,
+      `[data-pane-id="${paneId}"].pm-live`,
     );
     if (!rootEl) return;
     const headingEl = findHeadingEl(rootEl, item.id);

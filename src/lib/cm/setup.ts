@@ -114,6 +114,11 @@ export interface EditorSetupOptions {
   liveExtension: Extension;
   /** Called for every view update; see `hooks/useDocSync.ts`. */
   onUpdate(update: ViewUpdate): void;
+  /**
+   * 额外扩展（需求2）：例如 `EditorView.domEventHandlers({ contextmenu })`，
+   * 用于接管编辑器原生右键并弹出自定义菜单。
+   */
+  extraExtensions?: Extension[];
 }
 
 /** Build the initial `EditorState` for a pane. */
@@ -122,6 +127,7 @@ export function createEditorState(options: EditorSetupOptions): EditorState {
     doc: options.doc,
     extensions: [
       ...baseExtensions(),
+      ...(options.extraExtensions ?? []),
       fontCompartment.of(fontTheme(options.fontFamily, options.fontSize)),
       darkCompartment.of(EditorView.darkTheme.of(options.dark)),
       liveCompartment.of(options.liveExtension),

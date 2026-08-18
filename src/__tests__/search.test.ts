@@ -9,9 +9,14 @@ import type { EditorHandle } from "../lib/editorRegistry";
 import { findMatches, jumpToMatch, type SearchMatch } from "../lib/search";
 
 /** A minimal `EditorHandle` double that records `setSelection` / `focus`. */
-function makeMockEditor(): EditorHandle & { setSelection: ReturnType<typeof vi.fn>; focus: ReturnType<typeof vi.fn> } {
+function makeMockEditor(): EditorHandle & {
+  setSelection: ReturnType<typeof vi.fn>;
+  focus: ReturnType<typeof vi.fn>;
+  scrollToLine: ReturnType<typeof vi.fn>;
+} {
   const setSelection = vi.fn();
   const focus = vi.fn();
+  const scrollToLine = vi.fn();
   return {
     paneId: "A",
     tabId: "tab-1",
@@ -22,7 +27,12 @@ function makeMockEditor(): EditorHandle & { setSelection: ReturnType<typeof vi.f
     getCursor: vi.fn(),
     focus,
     scrollToOffset: vi.fn(),
-  } as EditorHandle & { setSelection: ReturnType<typeof vi.fn>; focus: ReturnType<typeof vi.fn> };
+    scrollToLine,
+  } as EditorHandle & {
+    setSelection: ReturnType<typeof vi.fn>;
+    focus: ReturnType<typeof vi.fn>;
+    scrollToLine: ReturnType<typeof vi.fn>;
+  };
 }
 
 describe("findMatches", () => {
@@ -101,7 +111,7 @@ describe("findMatches", () => {
 });
 
 describe("jumpToMatch", () => {
-  it("delegates to the CM6 EditorHandle (setSelection + focus), never a textarea", () => {
+  it("delegates scrollToLine (which carries selection for CM6) + focus, never a textarea", () => {
     // A representative match — offsets can be arbitrary; we only assert they
     // are forwarded verbatim to the editor handle.
     const match: SearchMatch = {
@@ -114,12 +124,21 @@ describe("jumpToMatch", () => {
     };
 
     const editor = makeMockEditor();
-    jumpToMatch(editor, match);
+    jumpToMatch(editor, match, 0);
 
-    // Core contract: jump goes through the live CM6 handle (setSelection), not
-    // the legacy textarea bridge, and the editor is focused.
-    expect(editor.setSelection).toHaveBeenCalledTimes(1);
-    expect(editor.setSelection).toHaveBeenCalledWith(match.start, match.end);
+    // Core contract: jump goes through scrollToLine (for CM6 edit this is a
+    // single dispatch carrying both selection + scrollIntoView; for PM
+    // live/preview it scrolls + highlights via DOM lookup). setSelection is
+    // NOT called separately — that was the old two-dispatch pattern that caused
+    // off-by-line scroll bugs. The 3rd arg is the match's ordinal (result-list
+    // index), which PM-based views use to pick the exact occurrence.
+    expect(editor.setSelection).not.toHaveBeenCalled();
+    expect(editor.scrollToLine).toHaveBeenCalledTimes(1);
+    expect(editor.scrollToLine).toHaveBeenCalledWith(
+      match.lineNo,
+      { start: match.start, end: match.end },
+      0,
+    );
     expect(editor.focus).toHaveBeenCalledTimes(1);
   });
 
@@ -128,11 +147,17 @@ describe("jumpToMatch", () => {
     expect(matches).toHaveLength(3);
 
     const editor = makeMockEditor();
-    for (const m of matches) jumpToMatch(editor, m);
+    matches.forEach((m, i) => jumpToMatch(editor, m, i));
 
-    expect(editor.setSelection).toHaveBeenCalledTimes(3);
+    expect(editor.setSelection).not.toHaveBeenCalled();
+    expect(editor.scrollToLine).toHaveBeenCalledTimes(3);
     matches.forEach((m, i) => {
-      expect(editor.setSelection).toHaveBeenNthCalledWith(i + 1, m.start, m.end);
+      expect(editor.scrollToLine).toHaveBeenNthCalledWith(
+        i + 1,
+        m.lineNo,
+        { start: m.start, end: m.end },
+        i,
+      );
     });
     expect(editor.focus).toHaveBeenCalledTimes(3);
   });

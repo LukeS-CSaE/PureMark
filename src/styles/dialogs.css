@@ -1,0 +1,258 @@
+/* ============================================================
+ * 需求1：防脏写 / 刷新 / 文件内容冲突解决 —— 弹窗与提示条样式
+ * 复用 theme.css 的设计令牌（--surface / --primary / --shadow-* 等）
+ * ============================================================ */
+
+/* ---- 通用遮罩（确认弹窗 / 冲突解决页） ---- */
+.unsaved-overlay,
+.conflict-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+  z-index: 80;
+  animation: popover-in 0.2s var(--ease-out-quart) both;
+}
+
+/* ---- 未保存 / 刷新确认卡片 ---- */
+.unsaved-card {
+  width: min(420px, calc(100vw - 32px));
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-3);
+  padding: 20px 22px;
+  animation: popover-in 0.28s var(--ease-spring) both;
+}
+.unsaved-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.unsaved-title svg {
+  color: var(--primary);
+}
+.unsaved-body {
+  margin: 12px 0 18px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--foreground-muted);
+}
+.unsaved-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* 弹窗按钮（与工具栏 btn-icon 风格区分，使用文本按钮） */
+.unsaved-btn {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease-out-quart),
+    border-color 0.15s var(--ease-out-quart), color 0.15s var(--ease-out-quart);
+}
+.unsaved-btn:hover {
+  background: var(--surface-hover);
+}
+.unsaved-btn.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+.unsaved-btn.primary:hover {
+  background: var(--primary-hover);
+}
+.unsaved-btn.subtle {
+  color: var(--foreground-muted);
+}
+
+/* ---- 方案 B：外部改动非阻塞提示条 ---- */
+.ext-bar {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 12px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-2);
+  font-size: 13px;
+  animation: bar-in 0.26s var(--ease-spring) both;
+}
+.ext-bar svg {
+  color: var(--primary);
+  flex: none;
+}
+.ext-bar-text {
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ext-bar-actions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+.ext-bar-btn {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease-out-quart),
+    border-color 0.15s var(--ease-out-quart), color 0.15s var(--ease-out-quart);
+}
+.ext-bar-btn:hover {
+  background: var(--surface-hover);
+}
+.ext-bar-btn.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+.ext-bar-btn.primary:hover {
+  background: var(--primary-hover);
+}
+.ext-bar-btn.subtle {
+  color: var(--foreground-muted);
+}
+
+@keyframes bar-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* ---- 冲突解决页（左右分屏） ---- */
+.conflict-page {
+  width: min(960px, calc(100vw - 40px));
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-3);
+  padding: 20px 22px;
+  animation: popover-in 0.3s var(--ease-spring) both;
+}
+.conflict-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.conflict-head svg {
+  color: var(--primary);
+  flex: none;
+}
+.conflict-title {
+  white-space: nowrap;
+}
+.conflict-path {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--foreground-subtle);
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conflict-hint {
+  margin: 10px 0 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--foreground-muted);
+}
+.conflict-cols {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  min-height: 0;
+}
+.conflict-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.conflict-col-title {
+  flex: none;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground-muted);
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+}
+.conflict-pre {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre;
+  color: var(--foreground);
+}
+.diff-row {
+  padding: 0 12px;
+  min-height: 1.6em;
+}
+.diff-hl {
+  background: rgba(0, 113, 227, 0.1);
+}
+.conflict-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .unsaved-overlay,
+  .conflict-overlay,
+  .unsaved-card,
+  .conflict-page,
+  .ext-bar {
+    animation: none;
+  }
+}

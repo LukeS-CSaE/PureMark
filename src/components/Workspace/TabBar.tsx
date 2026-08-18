@@ -1,6 +1,10 @@
+import { type MouseEvent } from "react";
 import { useTabsStore } from "../../store/useTabsStore";
+import { useUIStore } from "../../store/useUIStore";
 import { activateTabInFocusedPane } from "../../lib/paneRouter";
 import { requestCloseTab } from "../../lib/closeGuard";
+import { buildTabMenu } from "../../lib/tabContextMenu";
+import type { EditorTab } from "../../types";
 import Icon from "../ui/Icon";
 
 /** Multi-tab strip with dirty dots and per-tab close buttons. */
@@ -15,6 +19,7 @@ export default function TabBar() {
           key={tab.id}
           className={`tab-item${tab.id === activeId ? " active" : ""}`}
           onClick={() => activateTabInFocusedPane(tab.id)}
+          onContextMenu={(e) => onTabContextMenu(e, tab)}
         >
           <span className="max-w-[180px] truncate">{tab.name}</span>
           {tab.dirty && (
@@ -36,4 +41,17 @@ export default function TabBar() {
       ))}
     </div>
   );
+}
+
+// 需求2：标签页右键 → 自定义菜单（关闭类操作逐项走 requestCloseTab 脏写守卫）
+function onTabContextMenu(e: MouseEvent, tab: EditorTab): void {
+  e.preventDefault();
+  e.stopPropagation();
+  useUIStore.getState().openContextMenu({
+    x: e.clientX,
+    y: e.clientY,
+    scope: "tab",
+    items: buildTabMenu(tab),
+    payload: { tabId: tab.id, path: tab.path },
+  });
 }

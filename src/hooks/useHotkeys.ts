@@ -24,13 +24,19 @@ export function matchHotkey(
   e: { key: string; ctrlKey: boolean; metaKey: boolean },
 ): (() => void) | null {
   const mod = e.ctrlKey || e.metaKey;
-  if (!mod) return null;
   const key = e.key.toLowerCase();
   for (const combo of Object.keys(map)) {
     const parts = combo.toLowerCase().split("+");
     const wantKey = parts[parts.length - 1];
     const wantsMod = parts.includes("ctrl") || parts.includes("cmd");
-    if (wantKey !== key || !wantsMod) continue;
+    if (wantKey !== key) continue;
+    if (wantsMod) {
+      // 需要修饰键的组合（如 Ctrl+F / Ctrl+R）：必须按下修饰键
+      if (!mod) continue;
+    } else {
+      // 无修饰键组合（如 F5）：无论是否按下修饰键都匹配，
+      // 以确保 Ctrl+F5 等也被拦截（设计 D2：F5/Ctrl+R 不放行）。
+    }
     return map[combo];
   }
   return null;

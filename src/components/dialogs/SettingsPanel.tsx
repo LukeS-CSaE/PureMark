@@ -2,7 +2,6 @@ import { useState, type CSSProperties } from "react";
 import { useConfigStore, DEFAULT_CONFIG } from "../../store/useConfigStore";
 import { useUIStore } from "../../store/useUIStore";
 import { usePanesStore } from "../../store/usePanesStore";
-import { setSplit } from "../../lib/paneRouter";
 import { ACCENT_PRESETS } from "../../lib/theme";
 import type { ThemePreference, ViewMode } from "../../types";
 import Icon, { type IconName } from "../ui/Icon";
@@ -212,13 +211,22 @@ export default function SettingsPanel() {
                     }}
                   />
                 </label>
+
+                <div className="settings-group settings-row">
+                  <span className="settings-row-label">显示滚动条</span>
+                  <Toggle
+                    label="显示滚动条"
+                    checked={config.showScrollbar}
+                    onChange={(v) => update({ showScrollbar: v })}
+                  />
+                </div>
               </>
             )}
 
             {active === "editor" && (
               <>
                 <div className="settings-group settings-row">
-                  <span className="settings-row-label">显示侧边栏</span>
+                  <span className="settings-row-label">显示文件树</span>
                   <Toggle
                     label="显示侧边栏"
                     checked={config.sidebarVisible}
@@ -229,14 +237,14 @@ export default function SettingsPanel() {
                   />
                 </div>
 
-                <div className="settings-group settings-row">
+                {/* <div className="settings-group settings-row">
                   <span className="settings-row-label">分屏视图（双栏）</span>
                   <Toggle
                     label="分屏视图（双栏）"
                     checked={config.workspaceLayout === "split"}
                     onChange={(v) => setSplit(v)}
                   />
-                </div>
+                </div> */}
 
                 <div className="settings-group settings-row">
                   <span className="settings-row-label">自动保存草稿</span>
@@ -244,6 +252,20 @@ export default function SettingsPanel() {
                     label="自动保存草稿"
                     checked={config.autoSave}
                     onChange={(v) => update({ autoSave: v })}
+                  />
+                </div>
+
+                <div className="settings-group settings-row">
+                  <span className="settings-row-label">
+                    CodeMirror 源码编辑器
+                    <span className="mt-1 block text-[11px] text-foreground-subtle">
+                      开启后视图栏新增「编辑」选项，使用 CodeMirror 源码视图（与实时/预览共享外壳样式）。
+                    </span>
+                  </span>
+                  <Toggle
+                    label="CodeMirror 源码编辑器"
+                    checked={config.useCodeMirrorSource}
+                    onChange={(v) => update({ useCodeMirrorSource: v })}
                   />
                 </div>
               </>

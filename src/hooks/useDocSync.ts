@@ -27,6 +27,7 @@ import {
   unregisterEditor,
   type EditorHandle,
 } from "../lib/editorRegistry";
+import { cmScrollToLine } from "../lib/cmSearchScroll";
 import { minimalChange } from "../lib/textDiff";
 import { isSyncTransaction, syncAnnotation } from "../lib/cm/setup";
 
@@ -95,7 +96,8 @@ export function createEditorHandle(
       const head = clampOffset(view, end);
       view.dispatch({
         selection: { anchor, head },
-        scrollIntoView: true,
+        // NOTE: 不带 scrollIntoView —— 搜索跳转的滚动交给 scrollToLine（第 4 行），
+        // 否则 CM6 的异步滚动会覆盖它。同文件分屏的 peer 光标同步也不应偷走滚动焦点。
         // Selection-only: carries the annotation for contract completeness;
         // the update listener ignores it anyway (it only reacts to doc changes).
         annotations: syncAnnotation.of(true),
@@ -138,6 +140,15 @@ export function createEditorHandle(
       view.dispatch({
         effects: EditorView.scrollIntoView(clampOffset(view, offset)),
         annotations: syncAnnotation.of(true),
+      });
+    },
+
+    scrollToLine(lineNo: number, match?: { start: number; end: number }, _ordinal?: number): void {
+      // 选中+滚动合为单次 dispatch：防止两次独立 dispatch 之间 CM6 内部
+      // 状态/插件（accessible / peer-forwarding / 更新监听）触发额外滚动覆盖目标位置。
+      // CM6 用精确 match.start/end 定位，ordinal 仅 PM 视图需要，这里忽略。
+      cmScrollToLine(view, lineNo, match, {
+        selection: match ? { from: match.start, to: match.end } : undefined,
       });
     },
   };
@@ -220,11 +231,28 @@ export function useDocSync(
       if (content === lastPushedRef.current) return;
       const change = minimalChange(view.state.doc.toString(), content);
       if (!change) return;
+      const docLen = view.state.doc.length;
+      // 需求 C3：合法性校验，防止越界 / 方向错误的 dispatch 抛错。
+      // 外部改动可能让 store 内容与本地文档结构突变，必须守住 from/to 边界。
+      if (change.from < 0 || change.to > docLen || change.from > change.to) {
+        console.warn(
+          "[useDocSync] 跳过非法回填区间：",
+          change,
+          "docLen=",
+          docLen,
+        );
+        return;
+      }
       lastPushedRef.current = content;
-      view.dispatch({
-        changes: change,
-        annotations: syncAnnotation.of(true),
-      });
+      // 整段 dispatch 保护：store 订阅回调里抛错不应冒泡成未捕获错误。
+      try {
+        view.dispatch({
+          changes: change,
+          annotations: syncAnnotation.of(true),
+        });
+      } catch (err) {
+        console.error("[useDocSync] 回填 dispatch 异常（已吞掉）：", err);
+      }
     };
 
     const initial = useTabsStore.getState().tabs.find((tab) => tab.id === tabId);

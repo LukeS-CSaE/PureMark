@@ -208,3 +208,44 @@ export const markdownFormatKeymap: KeyBinding[] = [
   { key: "Mod-Alt-6", run: toggleHeading(6) },
   { key: "Mod-Alt-0", run: toggleHeading(0) },
 ];
+
+/**
+ * 编辑器右键菜单可复用的格式命令名（设计 §7.2）。与 `markdownFormatKeymap`
+ * 的快捷键映射一一对应。
+ */
+export type EditorFormatName =
+  | "bold"
+  | "italic"
+  | "strike"
+  | "code"
+  | "link"
+  | "h1"
+  | "h2"
+  | "h3";
+
+/**
+ * 将格式命令名解析为可直接作用于 `EditorView` 的 CM `Command`，供自定义右键
+ * 菜单复用（与键盘快捷键完全一致：dispatch 带 `syncAnnotation.of(false)`）。
+ */
+export function formatCommand(name: EditorFormatName): Command {
+  switch (name) {
+    case "bold":
+      return toggleWrap("**");
+    case "italic":
+      return toggleWrap("*");
+    case "strike":
+      return toggleWrap("~~");
+    case "code":
+      return toggleWrap("`");
+    case "link":
+      return toggleLink;
+    case "h1":
+      return toggleHeading(1);
+    case "h2":
+      return toggleHeading(2);
+    case "h3":
+      return toggleHeading(3);
+    default:
+      return toggleWrap("**");
+  }
+}

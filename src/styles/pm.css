@@ -9,6 +9,11 @@
 
 .pm-live {
   height: 100%;
+  /* single 布局下 .editor-pane 是 flex 行：必须以弹性主轴占满剩余宽度，
+   * 否则空文档时内容自然宽度近零，右侧 TOC 的 clamp() 宽度会反占编辑区；
+   * 有内容时两者宽度才一致。min-width:0 允许长内容收缩不撑破布局。 */
+  flex: 1 1 0;
+  min-width: 0;
   overflow: auto;
   /* 浮于 editor-card 之上，底色与卡片一致（暗色沿用 --card） */
   background: var(--card);
@@ -76,7 +81,7 @@
   letter-spacing: -0.02em;
   margin: 0.75em 0 0.4em;
   padding-bottom: 0.3em;
-  border-bottom: 1px solid var(--border-subtle);
+  /* border-bottom: 1px solid var(--border-subtle); */
 }
 .pm-editor h3 {
   font-size: 1.3em;
@@ -197,8 +202,23 @@
 .pm-editor th,
 .pm-editor td {
   border: 1px solid var(--border);
-  padding: 8px 12px;
+  /* 修复 Bug：行高过高 + 文字不垂直居中
+     - 显式设置 line-height，避免继承父级 .pm-editor p { line-height: 1.7 }
+       或 .ProseMirror { line-height: var(--editor-line-height) } 把单元格撑大
+     - 显式设置 vertical-align: middle，让文字在单元格内垂直居中
+       （默认 baseline 对齐会让文字视觉上偏上）
+     - 配合更紧凑的 padding（6px 10px）进一步收紧行高 */
+  padding: 6px 10px;
+  line-height: 1.5;
+  vertical-align: middle;
   text-align: left;
+}
+/* 表格单元格内的段落会复用 .pm-editor p 的 14px 底部 margin，导致单元格
+   文字被顶起、上下不对齐。表格内段落清零外边距（特异性高于 .pm-editor p，
+   可覆盖其默认 margin: 0 0 14px）。 */
+.pm-editor td p,
+.pm-editor th p {
+  margin: 0;
 }
 .pm-editor th {
   background: var(--surface-2);
@@ -233,4 +253,15 @@
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/* ---- 搜索高亮（live / preview 共用 ProseMirror decoration） -------------- */
+
+/* 与搜索面板 .search-hl 同源：主题色驱动，暗色/换肤自动跟随 */
+.pm-search-hl {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-radius: 3px;
+  padding: 0 2px;
+  transition: opacity 0.3s ease-out;
 }

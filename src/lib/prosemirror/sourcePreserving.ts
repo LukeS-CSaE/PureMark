@@ -41,21 +41,25 @@ export function serializeSourcePreserving(
   // 结构对齐：当前文档、原始文档、源码切片三者顶层块数必须一致，才逐块保真。
   const paired = doc.childCount === originalDoc.childCount && originalDoc.childCount === blocks.length;
 
-  let out = seps[0] ?? "";
+  let out = paired ? seps[0] ?? "" : "";
   const total = doc.childCount;
   for (let k = 0; k < total; k++) {
-    const origNode = originalDoc.child(k);
     const curNode = doc.child(k);
-    const blk = blocks[k];
-    if (paired && blk && nodeSignature(curNode) === nodeSignature(origNode)) {
+    // 仅当结构对齐、且索引未越界时，才回退到「原块字节」或「签名比对」。
+    // 未对齐（如新建空文档首行后敲回车、块数增多）必须全量重序列化，
+    // 否则 originalDoc.child(k) 会越界抛错，导致 live 视图写回 store 中断、
+    // 切换 edit/preview 时内容丢失（见 issue）。
+    const origNode = paired && k < originalDoc.childCount ? originalDoc.child(k) : null;
+    const blk = paired && k < blocks.length ? blocks[k] : null;
+    if (origNode && blk && nodeSignature(curNode) === nodeSignature(origNode)) {
       out += blk.src; // 未改动：字节级原样回写
     } else {
       out += serializeNode(curNode).replace(/\n+$/, "");
     }
-    if (k + 1 < seps.length) {
+    if (paired && k + 1 < seps.length) {
       out += seps[k + 1];
     } else if (k < total - 1) {
-      out += "\n\n"; // 新增块（多于源块）：规范空行
+      out += "\n\n"; // 新增/未对齐块之间：规范空行
     }
   }
 

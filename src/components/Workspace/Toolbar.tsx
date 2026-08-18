@@ -1,11 +1,13 @@
 import { useTabsStore } from "../../store/useTabsStore";
 import { useUIStore } from "../../store/useUIStore";
-import { openFileDialog, readFileText } from "../../commands/fsCommands";
+import { openFileDialog, readFileTextWithEncoding } from "../../commands/fsCommands";
 import { newUntitledInFocusedPane, openInFocusedPane } from "../../lib/paneRouter";
+import { guardRefresh } from "../../lib/refreshGuard";
 import Button from "../ui/Button";
 import ViewSwitcher from "./ViewSwitcher";
 import { useConfigStore } from "../../store/useConfigStore";
 import Icon from "../ui/Icon";
+import type { TocPosition } from "../../types";
 
 /**
  * 46px toolbar: file actions, the view switcher, and search / settings.
@@ -36,6 +38,21 @@ export default function Toolbar() {
     }
   }
 
+  /**
+   * 切换目录停靠方向（左 / 右）。逻辑与 StatusBar 保持一致：
+   * - 切到右时，侧边栏让位给文件树（sidebarMode = 'files'）；
+   * - 切回左且目录仍开启时，侧边栏回到目录（sidebarMode = 'toc'）。
+   */
+  function handleToggleTocPosition() {
+    const nextPos: TocPosition = tocPosition === "left" ? "right" : "left";
+    useConfigStore.getState().update({ tocPosition: nextPos });
+    if (nextPos === "right") {
+      useUIStore.getState().setSidebarMode("files");
+    } else if (useConfigStore.getState().config.tocVisible) {
+      useUIStore.getState().setSidebarMode("toc");
+    }
+  }
+
   async function handleNew() {
     newUntitledInFocusedPane();
   }
@@ -43,9 +60,10 @@ export default function Toolbar() {
   async function handleOpen() {
     const path = await openFileDialog();
     if (!path) return;
-    const content = await readFileText(path);
+    // 编码自动检测（UTF-8 / GBK / GB2312 / Big5 / UTF-16），保存时按原编码写回。
+    const { content, encoding, hadBom } = await readFileTextWithEncoding(path);
     const name = path.split(/[\\/]/).pop() ?? path;
-    openInFocusedPane({ path, name, content });
+    openInFocusedPane({ path, name, content, encoding, hadBom });
   }
 
   async function handleSave() {
@@ -73,6 +91,15 @@ export default function Toolbar() {
           onClick={handleToggleToc}
         />
 
+        {/* 仅当目录已开启时，才显示"目录停靠左/右切换"按钮 */}
+        {tocVisible && (
+          <Button
+            icon={tocPosition === "left" ? "PanelLeft" : "PanelRight"}
+            title={tocPosition === "left" ? "目录移到右侧" : "目录移到左侧"}
+            onClick={handleToggleTocPosition}
+          />
+        )}
+
         {/* <span className="tool-sep" /> */}
 
       </div>
@@ -92,6 +119,7 @@ export default function Toolbar() {
 
 
       <div className="ml-auto tool-group">
+        <Button icon="RefreshCw" title="刷新 (Ctrl+R)" onClick={() => void guardRefresh()} />
         <Button icon="Search" title="查找" onClick={() => setSearchOpen(true)} />
         <Button icon="Settings" title="设置" onClick={() => setConfigOpen(true)} />
       </div>

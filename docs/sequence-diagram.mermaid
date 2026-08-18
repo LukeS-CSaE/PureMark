@@ -1,56 +1,99 @@
 sequenceDiagram
-    actor User
-    participant UI as Sidebar/UI
-    participant Store as useTabsStore/useUIStore
-    participant Cmd as fsCommands
-    participant Rust as Rust backend
-    participant FS as File System
-    participant MD as markdown+highlight
-    participant Edit as EditorPane(textarea)
-    participant Preview as PreviewPane
+    actor U as 用户
+    participant TB as Toolbar/快捷键
+    participant RG as RefreshGuard
+    participant TS as useTabsStore
+    participant D as UnsavedDialog
+    participant FS as fsCommands(stat/readFileText)
 
-    Note over User,Rust: 1) 打开文件夹
-    User->>UI: 点击 "Open Folder"
-    UI->>Cmd: openFolderDialog()
-    Cmd->>Rust: dialog.open({directory:true})
-    Rust->>User: 选择文件夹
-    Rust-->>Cmd: folderPath
-    Cmd->>Rust: invoke('build_tree',{path:folderPath})
-    Rust->>FS: std::fs::read_dir 递归
-    FS-->>Rust: 条目列表
-    Rust-->>Cmd: FileNode[] (仅 .md + 含 md 目录)
-    Cmd->>Store: useUIStore.setFolder(folderPath, tree)
-    UI->>Store: 订阅并渲染 FileTree
+    U->>TB: 点击刷新 / Ctrl+R / F5
+    TB->>RG: guardRefresh()
+    RG->>TS: getActive() 是否有 path
+    alt 活动标签无 path（未保存文档）
+        RG-->>U: 无文件可刷新（toast/忽略）
+    else 有 path
+        RG->>TS: isAnyDirty()
+        alt 无未保存改动
+            RG->>FS: readFileText(path)
+            FS-->>RG: diskContent
+            RG->>TS: reloadFromDisk(path, diskContent)
+            RG-->>U: 刷新完成（buffer = 磁盘）
+        else 存在未保存改动
+            RG->>D: confirmRefresh() → Promise
+            D-->>U: [保存并刷新][不保存][取消]
+            alt 保存并刷新
+                U->>D: 保存并刷新
+                D-->>RG: 'saveReload'
+                RG->>TS: saveActive()
+                RG->>FS: readFileText(path)
+                RG->>TS: reloadFromDisk(path)
+            else 不保存（丢弃内存）
+                U->>D: 不保存
+                D-->>RG: 'discardReload'
+                RG->>FS: readFileText(path)
+                RG->>TS: reloadFromDisk(path)
+            else 取消
+                U->>D: 取消
+                D-->>RG: 'cancel'
+                RG-->>U: 中止刷新
+            end
+        end
+    end
 
-    Note over User,Rust: 2) 打开文件（点击树节点）
-    User->>UI: 点击 .md 文件
-    UI->>Cmd: readFileText(path)
-    Cmd->>Rust: fs.readTextFile(path)
-    Rust->>FS: 读文本
-    FS-->>Rust: content
-    Rust-->>Cmd: content
-    Cmd->>Store: useTabsStore.openTab({path,name,content})
-    Store->>UI: 新增/激活 Tab
+---
 
-    Note over User,Rust: 3) 编辑（实时）
-    User->>Edit: 输入文本
-    Edit->>Store: updateContent(activeId, value)
-    Store->>Store: dirty = content!==savedContent
-    Edit->>MD: render(value)
-    MD->>Preview: HTML + hljs 高亮
-    Preview-->>UI: 渲染预览（split/preview 视图）
+sequenceDiagram
+    actor U as 用户
+    participant CG as CloseGuard(registerCloseGuard / requestCloseTab)
+    participant TS as useTabsStore
+    participant CD as ConflictDetector
+    participant D as UnsavedDialog
+    participant UI as useUIStore
+    participant CRP as ConflictResolvePage
+    participant FS as fsCommands
 
-    Note over User,Rust: 4) 切换视图
-    User->>UI: 点击 编辑/分屏/预览
-    UI->>Store: useUIStore.setViewMode(mode)
-    UI->>UI: 重排 EditorPane / PreviewPane
-
-    Note over User,Rust: 5) 保存 (Ctrl+S)
-    User->>UI: Ctrl+S
-    UI->>Store: useTabsStore.saveActive()
-    Store->>Cmd: writeFileText(path, content)
-    Cmd->>Rust: fs.writeTextFile(path, content)
-    Rust->>FS: 写回原文件
-    Rust-->>Cmd: ok
-    Cmd->>Store: savedContent=content; dirty=false
-    UI->>UI: 清除标签脏标记 / 状态栏更新
+    U->>CG: 关闭窗口X / 关闭标签X
+    CG->>TS: isAnyDirty()
+    alt 无未保存改动
+        CG-->>U: 直接关闭 / 关闭标签
+    else 有未保存改动
+        CG->>CD: detectConflict(dirtyTab)
+        CD->>FS: stat(path) + readFileText(path)
+        CD-->>CG: ConflictState{hasConflict, diskContent, diskSignature}
+        CG->>D: confirmClose(conflict = state.hasConflict)
+        D-->>U: [保存][不保存][取消] (+[查看冲突] if conflict)
+        alt 查看冲突
+            U->>D: 查看冲突
+            D-->>CG: 'viewConflict'
+            CG->>UI: openConflictView(model)
+            UI->>CRP: 渲染左右分屏
+            CRP-->>U: 左=磁盘(只读) 右=内存
+            alt 采用磁盘版本
+                U->>CRP: 采用磁盘版本
+                CRP->>TS: reloadFromDisk(path, diskContent)
+                CRP->>UI: closeConflictView()
+                CG-->>U: 回到编辑（buffer=磁盘，干净）
+            else 保留我的版本
+                U->>CRP: 保留我的版本
+                CRP->>TS: saveActive()  // 内存写回磁盘，覆盖外部改动
+                CRP->>UI: closeConflictView()
+            else 取消
+                U->>CRP: 取消
+                CRP->>UI: closeConflictView()
+                CG-->>U: 保持窗口
+            end
+        else 保存
+            U->>D: 保存
+            D-->>CG: 'save'
+            CG->>TS: saveActive()
+            CG-->>U: 关闭
+        else 不保存
+            U->>D: 不保存
+            D-->>CG: 'discard'
+            CG-->>U: 关闭
+        else 取消
+            U->>D: 取消
+            D-->>CG: 'cancel'
+            CG-->>U: 保持窗口
+        end
+    end

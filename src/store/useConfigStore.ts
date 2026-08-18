@@ -52,6 +52,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   autoSave: true,
   autoSaveDelay: 800,
   useProseMirrorLive: true,
+  useCodeMirrorSource: false,
+  showScrollbar: true,
 };
 
 /* ------------------------------------------------------------------ *
@@ -180,6 +182,8 @@ export function migrateConfig(raw: unknown): AppConfig {
       autoSave: readBoolean(r.autoSave, DEFAULT_CONFIG.autoSave),
       autoSaveDelay: readNumber(r.autoSaveDelay, DEFAULT_CONFIG.autoSaveDelay),
       useProseMirrorLive: readBoolean(r.useProseMirrorLive, DEFAULT_CONFIG.useProseMirrorLive),
+      useCodeMirrorSource: readBoolean(r.useCodeMirrorSource, DEFAULT_CONFIG.useCodeMirrorSource),
+      showScrollbar: readBoolean(r.showScrollbar, DEFAULT_CONFIG.showScrollbar),
     };
   } catch (err) {
     console.warn("[config] migration failed, falling back to defaults:", err);

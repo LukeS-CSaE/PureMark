@@ -1,20 +1,19 @@
-import { lazy, Suspense, Component, type ReactNode } from "react";
+import { Component, type ReactNode } from "react";
 import Toolbar from "./Toolbar";
 import CodeEditor from "./CodeEditor";
-import PreviewPane from "./PreviewPane";
+import MarkdownView from "./MarkdownView";
 import TocPanel from "../Toc/TocPanel";
-
-// live 视图 = ProseMirror/TipTap（已全量替换 CM6 live）。懒加载其依赖链
-// （@tiptap/*、tiptap-markdown、prosemirror-*）只为避免拖慢首屏；加载期间与
-// 运行时崩溃均以 CM6 live 兜底，绝不让整窗白屏。
-const ProseMirrorEditor = lazy(() => import("./ProseMirrorEditor"));
+import { usePanesStore } from "../../store/usePanesStore";
+import { useConfigStore } from "../../store/useConfigStore";
+import type { Pane } from "../../types";
 
 /**
- * live 视图崩溃保护：TipTap 运行时若抛错，退回 CM6 live 而非让整个编辑器卡片
- * 白屏（用户此前最反感的症状）。属安全网，不改变「live = TipTap」的决定。
+ * 视图崩溃保护：TipTap / 渲染异常时不要把整窗拖白。
+ * 若用户已开启 CodeMirror 源码编辑器（useCodeMirrorSource），退回 CM 源码视图；
+ * 否则降级为空（绝不白屏）。原 live 视图的「CM 兜底」逻辑在此归一。
  */
-class LiveErrorBoundary extends Component<
-  { fallback: ReactNode; children: ReactNode },
+class ViewErrorBoundary extends Component<
+  { cmFallback: ReactNode; children: ReactNode },
   { hasError: boolean }
 > {
   state = { hasError: false };
@@ -22,21 +21,23 @@ class LiveErrorBoundary extends Component<
     return { hasError: true };
   }
   componentDidCatch(err: unknown) {
-    console.error("[live] ProseMirror live view crashed, falling back to CM6:", err);
+    console.error("[view] MarkdownView crashed, degrading:", err);
   }
   render() {
-    return this.state.hasError ? this.props.fallback : this.props.children;
+    return this.state.hasError ? this.props.cmFallback : this.props.children;
   }
 }
-
-import { usePanesStore } from "../../store/usePanesStore";
-import { useConfigStore } from "../../store/useConfigStore";
-import type { Pane } from "../../types";
 
 /**
  * 编辑器卡片：顶部 Toolbar，下方内容区按 `usePanesStore` 渲染 pane。
  * single 布局一个 pane；split 布局两个 pane 左右并排，宽度由 splitRatio 决定。
- * 每个 pane：edit/live 渲染 CodeEditor，preview 渲染 PreviewPane。
+ *
+ * 三视图统一渲染核心（ProseMirror / TipTap）：
+ *   - preview                → MarkdownView 只读
+ *   - live                   → MarkdownView 可编辑
+ *   - edit（CM 开启时）      → CodeEditor 源码编辑器
+ *   - edit（CM 关闭时）      → 合并进 live（同 MarkdownView 可编辑），保证
+ *                              「实时 / 预览」两种形态 + 渲染结果完全一致。
  */
 export default function EditorCard() {
   const layout = usePanesStore((s) => s.layout);
@@ -45,28 +46,31 @@ export default function EditorCard() {
 
   const tocVisible = useConfigStore((s) => s.config.tocVisible);
   const tocPosition = useConfigStore((s) => s.config.tocPosition);
+  const useCmSource = useConfigStore((s) => s.config.useCodeMirrorSource);
 
   const renderPane = (pane: Pane) => {
+    const tabId = pane.tabId ?? "";
+    // CM 源码编辑器作为「编辑」视图的兜底：live 崩溃时退回到源码，否则降级为空。
+    const cmFallback = useCmSource ? <CodeEditor paneId={pane.id} tabId={tabId} /> : null;
+
     if (pane.viewMode === "preview") {
-      return <PreviewPane paneId={pane.id} tabId={pane.tabId ?? ""} />;
-    }
-    // live 视图 = ProseMirror/TipTap（已全量替换 CM6 live；加载期/崩溃均 CM6 兜底）。
-    if (pane.viewMode === "live") {
-      const cmFallback = <CodeEditor paneId={pane.id} tabId={pane.tabId} viewMode="live" />;
       return (
-        <LiveErrorBoundary fallback={cmFallback}>
-          <Suspense fallback={cmFallback}>
-            <ProseMirrorEditor paneId={pane.id} tabId={pane.tabId} viewMode="live" />
-          </Suspense>
-        </LiveErrorBoundary>
+        <ViewErrorBoundary cmFallback={null}>
+          <MarkdownView paneId={pane.id} tabId={tabId} editable={false} />
+        </ViewErrorBoundary>
       );
     }
+
+    // 仅当开启 CodeMirror 源码编辑器时，edit 才是独立的源码视图。
+    if (pane.viewMode === "edit" && useCmSource) {
+      return <CodeEditor paneId={pane.id} tabId={tabId} />;
+    }
+
+    // 其余（live，以及未开启 CM 时的 edit 合并进 live）→ 可编辑 ProseMirror。
     return (
-      <CodeEditor
-        paneId={pane.id}
-        tabId={pane.tabId}
-        viewMode={pane.viewMode === "edit" ? "edit" : "live"}
-      />
+      <ViewErrorBoundary cmFallback={cmFallback}>
+        <MarkdownView paneId={pane.id} tabId={tabId} editable />
+      </ViewErrorBoundary>
     );
   };
 

@@ -1,0 +1,61 @@
+sequenceDiagram
+    actor U as 用户
+    participant CM as CodeEditor(CM6)
+    participant G as contextMenuGuard
+    participant UI as useUIStore
+    participant M as ContextMenu(portal)
+    participant CMD as CmCommands/EditorHandle
+
+    U->>CM: 右键（编辑器内）
+    CM->>G: capture 阶段先触发（已移除 .cm-content 豁免）
+    G-->>CM: preventDefault（压制原生）
+    CM->>CM: domEventHandlers.contextmenu 触发
+    CM->>CM: 计算选区 + focusPane(paneId)
+    CM->>UI: openContextMenu(editorMenu, x, y)
+    UI->>M: 渲染（portal 至 body）
+    M-->>U: 显示菜单（撤销/重做/剪切/复制/粘贴/全选/格式…）
+    U->>M: 点「加粗」
+    M->>CMD: formatCommand('bold')(view)
+    CMD->>CMD: toggleWrap('**') dispatch(syncAnnotation=false)
+    CMD->>UI: closeContextMenu()
+
+---
+
+sequenceDiagram
+    actor U as 用户
+    participant FT as FileTree
+    participant G as contextMenuGuard
+    participant UI as useUIStore
+    participant M as ContextMenu
+    participant FO as FileOps/Rust
+
+    U->>FT: 右键（文件/目录节点）
+    FT->>G: capture 阶段（.file-tree 已压制）
+    G-->>FT: preventDefault
+    FT->>UI: openContextMenu(fileMenu, x, y, {path,isDir})
+    UI->>M: 渲染
+    U->>M: 点「重命名」
+    M->>FO: renameFile(path, newName)
+    FO->>FO: invoke('rename_file', {path, newName})
+    FO->>UI: setFolder(重建树) + 刷新打开的 tab(若路径变化)
+    FO->>UI: closeContextMenu()
+
+---
+
+sequenceDiagram
+    actor U as 用户
+    participant TB as TabBar
+    participant G as contextMenuGuard
+    participant UI as useUIStore
+    participant M as ContextMenu
+    participant TS as useTabsStore
+
+    U->>TB: 右键（tab-item）
+    TB->>G: capture 阶段（.editor-pane/.app-workspace 已压制）
+    G-->>TB: preventDefault
+    TB->>UI: openContextMenu(tabMenu, x, y, {tabId})
+    UI->>M: 渲染
+    U->>M: 点「关闭其他」
+    M->>TS: closeOthers(tabId)
+    TS->>TS: 过滤 tabs + detachTab 释放 pane
+    TS->>UI: closeContextMenu()

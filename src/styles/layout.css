@@ -27,21 +27,77 @@ button {
   font-family: inherit;
 }
 
-/* Thin, unobtrusive scrollbars */
+/* ------------------------------------------------------------------ *
+ * Unified light scrollbars (2026-08 scrollbar-unify)
+ * One shared definition for every in-app scroll container:
+ *   - sidebar file tree (.file-scroll)
+ *   - editor split panes (.editor-split)
+ *   - CodeMirror edit view (.cm-editor .cm-scroller)
+ *   - ProseMirror live view / preview (.pm-live)
+ *   - document outline (.toc-scroll)
+ * Thumb uses the faint --border-subtle and deepens slightly on hover;
+ * the track stays transparent so it blends into the surface.
+ * ------------------------------------------------------------------ */
+.file-scroll,
+.editor-split,
+.cm-editor .cm-scroller,
+.pm-live,
+.toc-scroll,
 .scroll-thin {
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: var(--border-subtle) transparent;
 }
+.file-scroll::-webkit-scrollbar,
+.editor-split::-webkit-scrollbar,
+.cm-editor .cm-scroller::-webkit-scrollbar,
+.pm-live::-webkit-scrollbar,
+.toc-scroll::-webkit-scrollbar,
 .scroll-thin::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
+.file-scroll::-webkit-scrollbar-thumb,
+.editor-split::-webkit-scrollbar-thumb,
+.cm-editor .cm-scroller::-webkit-scrollbar-thumb,
+.pm-live::-webkit-scrollbar-thumb,
+.toc-scroll::-webkit-scrollbar-thumb,
 .scroll-thin::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: var(--border-subtle);
   border-radius: 999px;
 }
+.file-scroll::-webkit-scrollbar-thumb:hover,
+.editor-split::-webkit-scrollbar-thumb:hover,
+.cm-editor .cm-scroller::-webkit-scrollbar-thumb:hover,
+.pm-live::-webkit-scrollbar-thumb:hover,
+.toc-scroll::-webkit-scrollbar-thumb:hover,
+.scroll-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--border);
+}
+.file-scroll::-webkit-scrollbar-track,
+.editor-split::-webkit-scrollbar-track,
+.cm-editor .cm-scroller::-webkit-scrollbar-track,
+.pm-live::-webkit-scrollbar-track,
+.toc-scroll::-webkit-scrollbar-track,
 .scroll-thin::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* Global toggle: hide every scrollbar when the user opts out. */
+.app-shell.hide-scrollbars .file-scroll,
+.app-shell.hide-scrollbars .editor-split,
+.app-shell.hide-scrollbars .cm-editor .cm-scroller,
+.app-shell.hide-scrollbars .pm-live,
+.app-shell.hide-scrollbars .toc-scroll,
+.app-shell.hide-scrollbars .scroll-thin {
+  scrollbar-width: none;
+}
+.app-shell.hide-scrollbars .file-scroll::-webkit-scrollbar,
+.app-shell.hide-scrollbars .editor-split::-webkit-scrollbar,
+.app-shell.hide-scrollbars .cm-editor .cm-scroller::-webkit-scrollbar,
+.app-shell.hide-scrollbars .pm-live::-webkit-scrollbar,
+.app-shell.hide-scrollbars .toc-scroll::-webkit-scrollbar,
+.app-shell.hide-scrollbars .scroll-thin::-webkit-scrollbar {
+  display: none;
 }
 
 /* ---- App shell skeleton ---- */
@@ -177,19 +233,6 @@ button {
   flex: 1 1 auto;
   overflow: auto;
   min-height: 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-.file-scroll::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-.file-scroll::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 999px;
-}
-.file-scroll::-webkit-scrollbar-track {
-  background: transparent;
 }
 
 /* ---- Tabs ---- */
@@ -238,7 +281,7 @@ button {
   background: var(--card);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-2);
+  box-shadow: none;        /* 轻量化：去掉浮起阴影，仅保留 hairline 描边，与全局卡片风格统一 */
   overflow: hidden;
 }
 
@@ -250,7 +293,7 @@ button {
   gap: 8px;
   padding: 0 12px;
   background: var(--card);
-  border-bottom: 1px solid var(--hairline);
+  /* border-bottom: 1px solid var(--hairline); */
 }
 
 .tool-group {
@@ -278,19 +321,6 @@ button {
   display: flex;
   flex-direction: column;
   overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-.editor-split::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-.editor-split::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 999px;
-}
-.editor-split::-webkit-scrollbar-track {
-  background: transparent;
 }
 
 /* ---- iter2-ext: table-of-contents (outline) panel -------------------- */
@@ -302,7 +332,7 @@ button {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  border-left: 1px solid var(--border);
+  /* border-left: 1px solid var(--border); */
   background: var(--surface);
   overflow: hidden;
 }
@@ -597,19 +627,22 @@ button {
   flex: 1;
   min-height: 0;
   align-items: stretch;
-  gap: 18px;
+  gap: 0;                   /* 左栏已用竖分隔线划分，去掉多余间距 */
   padding: 2px 20px 22px;
 }
 .settings-nav {
-  width: 184px;
-  flex: none;
+  /* 去卡片化：左栏作为轻量导航，不再浮起为卡片 */
+  flex: 0 0 22%;            /* 宽度按弹窗宽度百分比，不再写死像素 */
+  min-width: 150px;         /* 极窄弹窗时仍保证可读、可用 */
+  max-width: 220px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 10px 8px;
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  box-shadow: var(--shadow-1);
+  padding: 10px 12px 10px 4px;
+  background: transparent;  /* 去卡片底 */
+  box-shadow: none;         /* 去阴影 */
+  border-radius: 0;         /* 去圆角 */
+  border-right: 1px solid var(--hairline);  /* 与正文之间的 1px 竖分隔线 */
   overflow-y: auto;
   scrollbar-width: none;
 }
@@ -643,7 +676,7 @@ button {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  padding: 12px 2px;
+  padding: 12px 2px 12px 18px;  /* 左侧留白，避开竖分隔线 */
   overflow-y: auto;
   scrollbar-width: none;
 }

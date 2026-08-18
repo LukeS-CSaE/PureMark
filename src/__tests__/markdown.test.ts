@@ -1,6 +1,6 @@
 /**
  * Unit tests for `src/lib/markdown.ts` — the `marked` GFM rendering pipeline.
- * Assertions target the semantic HTML that `src/styles/preview.css` styles,
+ * Assertions target the semantic HTML that `src/lib/markdown.ts` produces,
  * not the exact string, so minor `marked` formatting changes do not break them.
  */
 import { describe, expect, it } from "vitest";

@@ -49,9 +49,13 @@
 }
 
 .search-count {
+  display: inline-flex;
+  align-items: center;
+  height: 26px; /* 与 .btn-icon 同高，行内文字与上下键按钮严格垂直居中 */
   font-size: 12px;
+  line-height: 1;
   color: var(--foreground-muted);
-  padding: 4px 2px 6px;
+  padding: 0 2px;
 }
 
 .search-result-list {
@@ -96,17 +100,24 @@
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   font-family: var(--font-mono);
 }
 
+/* 匹配高亮跟随主题色（--primary 由 applyAccent 运行时驱动，暗色自动适配） */
 .search-hl {
-  background: #fde047;
-  color: #1f2328;
+  background: var(--primary-soft);
+  color: var(--primary);
   border-radius: 4px;
   padding: 0 1px;
 }
 
+.search-ellipsis {
+  color: var(--foreground-muted);
+  user-select: none;
+}
+
+/* 当前聚焦的匹配项：实色主题底 + 反白文字 */
 .search-result-item.active .search-hl {
-  background: #fb923c;
+  background: var(--primary);
+  color: var(--primary-foreground);
 }

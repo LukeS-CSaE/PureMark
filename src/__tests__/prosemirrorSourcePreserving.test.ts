@@ -154,4 +154,31 @@ describe("serializeSourcePreserving", () => {
     const c = schema.nodes.paragraph.create(null, schema.text("y"));
     expect(nodeSignature(a)).not.toBe(nodeSignature(c));
   });
+
+  it("new file (empty original) with multiple blocks serializes without throwing", () => {
+    // 复现 bug：新建空文档 originalDoc 仅 1 个空段落，用户敲回车产生第 2 个块后
+    // doc.childCount !== originalDoc.childCount → paired=false，旧实现会越界
+    // 访问 originalDoc.child(1) 抛 RangeError，导致 live 写回 store 中断、切
+    // 换 edit/preview 时内容丢失。修复后必须全量重序列化且不抛错。
+    const original = "";
+    const originalDoc = docFrom([schema.nodes.paragraph.create(null)]);
+    const doc = docFrom([
+      schema.nodes.paragraph.create(null, schema.text("hello")),
+      schema.nodes.paragraph.create(null, schema.text("world")),
+    ]);
+    const res = serialize(doc, originalDoc, original);
+    expect(res.matched).toBe(false);
+    expect(res.markdown).toBe("hello\n\nworld");
+  });
+
+  it("new file (empty original) with a heading + body preserves both blocks", () => {
+    const originalDoc = docFrom([schema.nodes.paragraph.create(null)]);
+    const doc = docFrom([
+      schema.nodes.heading.create({ level: 1 }, schema.text("Title")),
+      schema.nodes.paragraph.create(null, schema.text("body")),
+    ]);
+    const res = serialize(doc, originalDoc, "");
+    expect(res.matched).toBe(false);
+    expect(res.markdown).toBe("# Title\n\nbody");
+  });
 });

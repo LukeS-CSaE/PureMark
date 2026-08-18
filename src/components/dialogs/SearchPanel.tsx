@@ -1,9 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTabsStore } from "../../store/useTabsStore";
 import { useUIStore } from "../../store/useUIStore";
-import { getFocusedOrAnyEditor } from "../../lib/editorRegistry";
+import { getFocusedOrAnyEditor, getPeerEditors } from "../../lib/editorRegistry";
 import { findMatches, type SearchMatch, jumpToMatch } from "../../lib/search";
 import Icon from "../ui/Icon";
+
+/**
+ * Build a centered snippet around the match so the highlighted text shows up
+ * in the middle of the result row (instead of being clipped off-screen when a
+ * line is long). Mirrors how editor search results keep the match centered:
+ * take `ctx` chars of leading/trailing context, ellipsize the long side.
+ */
+const SNIPPET_CTX = 10;
+function buildSnippet(lineText: string, colStart: number, colEnd: number) {
+  const before = lineText.slice(0, colStart);
+  const match = lineText.slice(colStart, colEnd);
+  const after = lineText.slice(colEnd);
+  const lead = before.length > SNIPPET_CTX ? before.slice(before.length - SNIPPET_CTX) : before;
+  const trail = after.length > SNIPPET_CTX ? after.slice(0, SNIPPET_CTX) : after;
+  return {
+    headEllipsis: before.length > SNIPPET_CTX,
+    lead,
+    match,
+    trail,
+    tailEllipsis: after.length > SNIPPET_CTX,
+  };
+}
 
 /**
  * Find panel (v2). Computes matches via the pure `findMatches` helper, shows a
@@ -42,13 +64,17 @@ export default function SearchPanel() {
     if (matches.length === 0 || !active) return;
     const idx = ((i % matches.length) + matches.length) % matches.length;
     const m = matches[idx];
-    const ed = getFocusedOrAnyEditor();
-    if (ed) {
-      // Talk to the CM6 EditorHandle (setSelection scrolls into view + focus
-      // internally). The legacy textarea bridge returns null in live/edit mode,
-      // so a textarea jump would silently no-op here.
-      jumpToMatch(ed, m);
+
+    // 跳转所有展示当前文档的窗格（edit / live / preview 均已注册 EditorHandle）。
+    // 用 getPeerEditors(active.id, "__none__") 取同 tabId 的全部 handle，
+    // 避免 getFocusedOrAnyEditor() 在分屏/焦点错乱时指向别的文档导致跳转错位。
+    let editors = getPeerEditors(active.id, "__none__");
+    if (editors.length === 0) {
+      const fallback = getFocusedOrAnyEditor();
+      if (fallback) editors = [fallback];
     }
+    for (const ed of editors) jumpToMatch(ed, m, idx);
+
     setIndex(idx);
   }
 
@@ -131,12 +157,47 @@ export default function SearchPanel() {
                 className={`search-result-item${i === index ? " active" : ""}`}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => jumpTo(i)}
+                onContextMenu={(e) => {
+                  // 需求2：搜索结果项自定义右键菜单（替换原生，原生已被全局 guard 压制）。
+                  e.preventDefault();
+                  const matchText = m.lineText.slice(m.colStart, m.colEnd);
+                  useUIStore.getState().openContextMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    scope: "search",
+                    items: [
+                      { id: "jump", label: "跳转至此结果", icon: "ChevronRight", run: () => jumpTo(i) },
+                      { separator: true, id: "sep-s1" },
+                      {
+                        id: "copyMatch",
+                        label: "复制匹配文本",
+                        icon: "Copy",
+                        run: () => void navigator.clipboard?.writeText(matchText),
+                      },
+                      {
+                        id: "copyLine",
+                        label: "复制整行",
+                        icon: "ClipboardPaste",
+                        run: () => void navigator.clipboard?.writeText(m.lineText),
+                      },
+                    ],
+                  });
+                }}
               >
                 <span className="search-result-line">{m.lineNo}</span>
                 <span className="search-result-snippet">
-                  {m.lineText.slice(0, m.colStart)}
-                  <mark className="search-hl">{m.lineText.slice(m.colStart, m.colEnd)}</mark>
-                  {m.lineText.slice(m.colEnd)}
+                  {(() => {
+                    const s = buildSnippet(m.lineText, m.colStart, m.colEnd);
+                    return (
+                      <>
+                        {s.headEllipsis && <span className="search-ellipsis">…</span>}
+                        {s.lead}
+                        <mark className="search-hl">{s.match}</mark>
+                        {s.trail}
+                        {s.tailEllipsis && <span className="search-ellipsis">…</span>}
+                      </>
+                    );
+                  })()}
                 </span>
               </button>
             ))}

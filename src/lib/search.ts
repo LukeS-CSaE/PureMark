@@ -65,24 +65,30 @@ export function findMatches(content: string, query: string): SearchMatch[] {
 }
 
 /**
- * Jump the focused (or any editable) CodeMirror 6 editor to a search match.
+ * Jump the focused (or any editable) editor to a search match.
  *
- * This is the single source of truth for "scroll + focus to a match". It talks
- * to the live CM6 `EditorHandle` (see `editorRegistry.ts`) rather than the
- * legacy MVP textarea bridge, because in `live` / `edit` mode the editing
- * surface is a CodeMirror `EditorView`, not a `<textarea>` — so
- * `getActiveTextarea()` returns `null` there and a textarea-based jump silently
- * no-ops (search results / arrow keys would never move the caret or scroll).
+ * Order of operations (single dispatch for CM6 edit view):
+ *   1. `scrollToLine` — for CM6 `edit` this is a single dispatch that BOTH
+ *      selects the matched range AND scrolls it into view (selection +
+ *      scrollIntoView effect in one transaction, preventing any intermediate
+ *      CM6 state from triggering unwanted scroll overrides). For PM-based
+ *      `live` / `preview` views it locates the match by `ordinal` (the match's
+ *      index among all matches) and scrolls the block into view, then applies a
+ *      ProseMirror decoration highlight.
+ *   2. `focus` — activates the pane.
  *
- * `EditorHandle.setSelection` already performs `scrollIntoView` + `focus()`;
- * we additionally call `focus()` to be explicit. The function is DOM-free and
- * pure so it can be unit-tested under vitest's `node` environment by passing a
- * mock `EditorHandle`.
+ * The function is DOM-free and pure so it can be unit-tested under vitest's
+ * `node` environment by passing a mock `EditorHandle`.
  *
- * @param editor  the CM6 editor handle (from `getFocusedOrAnyEditor()`)
+ * @param editor  the editor handle (from `getPeerEditors()` or `getFocusedOrAnyEditor()`)
  * @param match   the match to jump to (`match.start` / `match.end` offsets)
+ * @param ordinal the match's 0-based index among all matches (result-list
+ *                index). PM-based views need it to pick the exact occurrence;
+ *                CM6 ignores it (it already has exact `start`/`end` offsets).
  */
-export function jumpToMatch(editor: EditorHandle, match: SearchMatch): void {
-  editor.setSelection(match.start, match.end);
+export function jumpToMatch(editor: EditorHandle, match: SearchMatch, ordinal: number): void {
+  // scrollToLine 对 edit 视图已在单次 dispatch 内完成选中+滚动；
+  // 对 live/preview 则按 ordinal 精确定位 + 滚动 + 高亮。
+  editor.scrollToLine(match.lineNo, { start: match.start, end: match.end }, ordinal);
   editor.focus();
 }

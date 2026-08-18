@@ -31,7 +31,9 @@ vi.mock("../lib/tauri", () => ({
 
 vi.mock("../commands/fsCommands", () => ({
   readFileText: vi.fn(async () => ""),
+  readFileTextWithEncoding: vi.fn(async () => ({ content: "", encoding: "utf-8", hadBom: false })),
   writeFileText: vi.fn(async () => undefined),
+  writeFileTextWithEncoding: vi.fn(async () => undefined),
   openFileDialog: vi.fn(async () => null),
   openFolderDialog: vi.fn(async () => null),
   saveFileDialog: vi.fn(async () => null),
@@ -63,9 +65,18 @@ beforeEach(resetAll);
  * EditorCard — what it reads out of the store
  * ------------------------------------------------------------------ */
 
-/** Mirrors `EditorCard.renderPane`: which component a pane resolves to. */
-function componentFor(viewMode: ViewMode): "CodeEditor" | "PreviewPane" {
-  return viewMode === "preview" ? "PreviewPane" : "CodeEditor";
+/**
+ * Mirrors `EditorCard.renderPane`: which component a pane resolves to.
+ * 统一视图重构后：preview / live 均为 MarkdownView（ProseMirror）；edit 在
+ * CM 关闭（默认）时合并进 live（也是 MarkdownView），仅开启 useCodeMirrorSource
+ * 后才独立为 CodeEditor。
+ */
+function componentFor(viewMode: ViewMode): "CodeEditor" | "MarkdownView" {
+  if (viewMode === "preview") return "MarkdownView";
+  if (viewMode === "edit" && useConfigStore.getState().config.useCodeMirrorSource) {
+    return "CodeEditor";
+  }
+  return "MarkdownView";
 }
 
 describe("EditorCard — store inputs", () => {
@@ -83,19 +94,25 @@ describe("EditorCard — store inputs", () => {
     expect(s.panes.map((p) => p.id)).toEqual(["A", "B"]);
   });
 
-  it("each ViewMode maps to the component EditorCard mounts", () => {
-    expect(componentFor("edit")).toBe("CodeEditor");
-    expect(componentFor("live")).toBe("CodeEditor");
-    expect(componentFor("preview")).toBe("PreviewPane");
+  it("each ViewMode maps to the component EditorCard mounts (CM off default)", () => {
+    expect(componentFor("edit")).toBe("MarkdownView");
+    expect(componentFor("live")).toBe("MarkdownView");
+    expect(componentFor("preview")).toBe("MarkdownView");
   });
 
-  it("the two panes can resolve to different components at the same time (R-12)", () => {
+  it("with CodeMirror source on, edit resolves to CodeEditor while preview stays MarkdownView (R-12)", () => {
+    useConfigStore.setState({
+      config: { ...useConfigStore.getState().config, useCodeMirrorSource: true },
+    });
     splitToggle();
     usePanesStore.getState().setPaneViewMode("A", "edit");
     usePanesStore.getState().setPaneViewMode("B", "preview");
     const [a, b] = usePanesStore.getState().panes;
     expect(componentFor(a!.viewMode)).toBe("CodeEditor");
-    expect(componentFor(b!.viewMode)).toBe("PreviewPane");
+    expect(componentFor(b!.viewMode)).toBe("MarkdownView");
+    useConfigStore.setState({
+      config: { ...useConfigStore.getState().config, useCodeMirrorSource: false },
+    });
   });
 
   it("splitRatio stays inside the range EditorCard turns into CSS widths", () => {
@@ -108,14 +125,14 @@ describe("EditorCard — store inputs", () => {
     expect(r).toBeLessThan(1);
   });
 
-  it("PreviewPane never receives a null tabId (EditorCard coerces to \"\")", () => {
+  it("MarkdownView never receives a null tabId (EditorCard coerces to \"\")", () => {
     usePanesStore.getState().setPaneViewMode("A", "preview");
     const pane = usePanesStore.getState().getFocusedPane();
     expect(pane.tabId).toBeNull();
-    // EditorCard: `<PreviewPane tabId={pane.tabId ?? ""} />`
+    // EditorCard: `<MarkdownView tabId={pane.tabId ?? ""} ... />`
     const passed = pane.tabId ?? "";
     expect(typeof passed).toBe("string");
-    // ...and PreviewPane's lookup degrades to the empty document.
+    // ...and MarkdownView's lookup degrades to the empty document.
     const content = useTabsStore.getState().tabs.find((t) => t.id === passed)?.content ?? "";
     expect(content).toBe("");
   });

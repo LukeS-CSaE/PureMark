@@ -33,7 +33,9 @@ vi.mock("../lib/tauri", () => ({
 
 vi.mock("../commands/fsCommands", () => ({
   readFileText: vi.fn(async () => ""),
+  readFileTextWithEncoding: vi.fn(async () => ({ content: "", encoding: "utf-8", hadBom: false })),
   writeFileText: vi.fn(async () => undefined),
+  writeFileTextWithEncoding: vi.fn(async () => undefined),
   openFileDialog: vi.fn(async () => null),
   openFolderDialog: vi.fn(async () => null),
   saveFileDialog: vi.fn(async () => null),

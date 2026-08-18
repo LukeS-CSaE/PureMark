@@ -1,5 +1,7 @@
+import type { IconName } from "../components/ui/Icon";
+
 /**
- * PureMark core type definitions. These mirror the Rust `FileNode` struct
+ * PureMark core type definitions. These mirror the Rust `FileNode` type
  * (serialized with camelCase) and the in-memory editor/tab/pane models.
  *
  * iter2 concept layering (design §1.2):
@@ -127,6 +129,19 @@ export interface EditorTab {
   /** content !== savedContent. */
   dirty: boolean;
   /**
+   * 文件原始编码（utf-8 / gb18030 / big5 / utf-16le / utf-16be）。
+   * 保存时按原编码写回，避免把 GBK 文档改写成 UTF-8；
+   * 未提供时按 utf-8 处理（新建文档 / 旧数据）。
+   */
+  encoding?: string;
+  /** 原文件是否带 BOM（保存时按原样写回）。 */
+  hadBom?: boolean;
+  /**
+   * 磁盘基线签名（mtime+size+内容hash），用于文件内容冲突检测（需求1）。
+   * 在打开 / 保存成功后写入；未保存文档为 null。
+   */
+  diskSignature: DiskSignature | null;
+  /**
    * @deprecated iter2: the caret belongs to a `Pane` (same-file split needs two
    * independent carets). Kept only for backwards compatibility — never write to
    * it from new code, read `usePanesStore` instead.
@@ -196,6 +211,22 @@ export interface AppConfig {
    * is fully reversible until Phase 3 removes it. See docs/项目认知与现状总览.md §6.
    */
   useProseMirrorLive: boolean;
+
+  /**
+   * 源码编辑器开关（统一视图重构，2026-08）。
+   * 默认 false：edit 视图合并进 live（两者都是可编辑 ProseMirror，渲染一致），
+   * 应用只暴露「实时 / 预览」两种形态。
+   * 设为 true：视图切换器新增「编辑」选项，选中后沿用重写的 CodeMirror 源码
+   * 编辑器（与 live / preview 共享外壳样式，但内容为原始 markdown 文本）。
+   */
+  useCodeMirrorSource: boolean;
+
+  /**
+   * Global scrollbar visibility (2026-08 scrollbar-unify): when true (default)
+   * the unified light scrollbars are shown across sidebar / editor / TOC;
+   * when false, all in-app scrollbars are hidden via `.app-shell.hide-scrollbars`.
+   */
+  showScrollbar: boolean;
 }
 
 export type FormatCommand =
@@ -224,3 +255,102 @@ export interface EditorStats {
 
 /** Drafts map: absolute path -> in-memory draft content. */
 export type DraftsMap = Record<string, string>;
+
+/* ---- 防脏写 / 刷新 / 冲突检测（需求1） ------------------------------------ */
+
+/** 磁盘文件状态基线：用于检测外部改动（设计 §3）。 */
+export interface DiskSignature {
+  /** 最后修改时间（毫秒）。 */
+  mtimeMs: number;
+  /** 文件字节大小。 */
+  size: number;
+  /** 内容指纹（FNV-1a），用于确认内容是否真的变化。 */
+  hash: string;
+}
+
+/** 文件元信息（封装 plugin-fs 的 stat）。 */
+export interface FileMeta {
+  /** 文件是否存在（stat 失败时为 false）。 */
+  exists: boolean;
+  mtimeMs: number;
+  size: number;
+}
+
+/** 单 tab 的冲突检测结果。 */
+export interface ConflictState {
+  hasConflict: boolean;
+  diskContent: string;
+  diskSignature: DiskSignature;
+}
+
+/** 冲突解决页视图模型（左右分屏所需的快照）。 */
+export interface ConflictViewModel {
+  tabId: string;
+  name: string;
+  path: string;
+  diskContent: string;
+  memoryContent: string;
+  diskMtimeMs: number;
+  memoryDirty: boolean;
+}
+
+/** 关闭 / 退出确认决策。 */
+export type CloseDecision = "save" | "discard" | "cancel" | "viewConflict";
+
+/** 刷新确认决策。 */
+export type RefreshDecision = "saveReload" | "discardReload" | "cancel";
+
+/** 自定义确认弹窗状态（驱动 UnsavedDialog 渲染）。 */
+export interface UnsavedDialogState {
+  mode: "close" | "refresh";
+  conflict: boolean;
+  names: string[];
+}
+
+/** 方案 B：外部改动非阻塞提示条的通知。 */
+export interface ExternalChangeNotice {
+  tabId: string;
+  name: string;
+  path: string;
+  diskContent: string;
+  diskMtimeMs: number;
+}
+
+/* ---- 自定义右键菜单（需求2） ---------------------------------------------- */
+
+/** 菜单作用域：编辑器 / 文件树 / 标签页 / 搜索结果。 */
+export type MenuScope = "editor" | "file" | "tab" | "search";
+
+/** 单个菜单项。separator 为 true 时仅渲染分隔线。 */
+export interface MenuItem {
+  /** 唯一 id（用于 key 与键盘导航）。 */
+  id: string;
+  /** 菜单文字（分隔线项无需提供）。 */
+  label?: string;
+  /** 图标名（复用 Icon 组件），无图标可为 null。 */
+  icon?: IconName | null;
+  /** 右侧快捷键提示，如 "Ctrl+B"。 */
+  shortcut?: string | null;
+  /** 禁用态（灰显且不可点击）。 */
+  disabled?: boolean;
+  /** 为 true 时仅渲染分隔线，忽略其余字段。 */
+  separator?: boolean;
+  /** 子菜单（P2 子菜单能力，当前预留）。 */
+  submenu?: MenuItem[] | null;
+  /** 点击执行的动作。 */
+  run?: () => void;
+}
+
+/** 受控菜单状态：驱动 <ContextMenu/> 渲染。 */
+export interface ContextMenuState {
+  /** 光标 clientX。 */
+  x: number;
+  /** 光标 clientY。 */
+  y: number;
+  /** 菜单项列表。 */
+  items: MenuItem[];
+  /** 作用域。 */
+  scope: MenuScope;
+  /** 触发源附带的上下文（路径 / 是否目录 / 标签 id）。 */
+  payload?: { path?: string; isDir?: boolean; tabId?: string } | null;
+}
