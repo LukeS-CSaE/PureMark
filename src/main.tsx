@@ -8,6 +8,8 @@ import "./styles/layout.css";
 // Must come after Tailwind's preflight (pulled in by theme.css) so the
 // `.cm-*` rules are not reset — design §1.7.
 import "./styles/live.css";
+// 代码块语法高亮（.hljs-* → --hl-* 令牌），需晚于 theme.css 的令牌定义。
+import "./styles/highlight.css";
 // Search panel styles (T02). Loaded last; the `.search-*` rules are scoped and
 // independent of the layout/preview chain above.
 import "./styles/search.css";

@@ -19,6 +19,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import type { Editor } from "@tiptap/core";
 import type { Node as PMNode } from "@tiptap/pm/model";
+import { TextSelection } from "@tiptap/pm/state";
 import { buildEditorExtensions } from "../../lib/prosemirror/editorExtensions";
 import type { MarkdownSerializer } from "prosemirror-markdown";
 import { useTabsStore } from "../../store/useTabsStore";
@@ -32,6 +33,8 @@ import { scrollToMatchOrdinal } from "../../lib/searchScroll";
 import { searchHighlightKey } from "../../lib/prosemirror/searchHighlight";
 import { buildMarkdownSerializer, serializeNodeToMarkdown } from "../../lib/prosemirror/markdownSerializer";
 import { serializeSourcePreserving } from "../../lib/prosemirror/sourcePreserving";
+import { buildBlockMenu } from "../../lib/prosemirror/blockContextMenu";
+import { useUIStore } from "../../store/useUIStore";
 import type { PaneId } from "../../types";
 import "../../styles/pm.css";
 
@@ -232,6 +235,28 @@ export default function MarkdownView({ paneId, tabId, editable }: Props) {
       data-view={editable ? "live" : "preview"}
       onMouseDownCapture={() => focusPane(paneId)}
       onFocusCapture={() => focusPane(paneId)}
+      onContextMenu={(e: import("react").MouseEvent) => {
+        // 文字块右键快捷菜单（仅可编辑视图）：上/下插入段落、删块、
+        // 表格内追加行操作。全局 guard 已在 capture 阶段压制原生菜单，
+        // 这里在冒泡阶段打开自定义菜单（与 CodeEditor 同源接线）。
+        if (!editable || !editor?.view) return;
+        e.preventDefault();
+        focusPane(paneId);
+        // 先把光标移到右键点击处，保证菜单动作作用于点击处的块。
+        const pos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
+        if (pos != null) {
+          editor.view.dispatch(
+            editor.state.tr.setSelection(TextSelection.near(editor.state.doc.resolve(pos.pos))),
+          );
+        }
+        useUIStore.getState().openContextMenu({
+          x: e.clientX,
+          y: e.clientY,
+          scope: "editor",
+          items: buildBlockMenu(editor),
+          payload: { tabId: tabId ?? undefined },
+        });
+      }}
     >
       <EditorContent editor={editor} />
     </div>

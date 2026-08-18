@@ -25,7 +25,7 @@ export default function Header() {
           draggable={false}
           data-tauri-drag-region
         />
-        <span className="text-[15px] font-bold" data-tauri-drag-region>
+        <span className="header-title" data-tauri-drag-region>
           PureMark
         </span>
       </div>

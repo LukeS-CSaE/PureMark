@@ -55,34 +55,25 @@ export default function Sidebar() {
     useUIStore.getState().setSidebarMode(mode);
   };
 
+  // 文件⇄目录合并为单个切换按钮：图标/文案指向切换目标，点击在两种模式间翻转。
+  const switchTarget: SidebarMode = sidebarMode === "files" ? "toc" : "files";
+
   return (
     <aside className="app-sidebar" style={{ width: sidebarWidth }}>
       <div className="app-sidebar-head">
         <span className="explorer-label">文件目录</span>
         <div className="flex items-center gap-0.5">
           {showTocSwitch && (
-            <div className="toc-switch" role="group" aria-label="切换文件树与目录">
-              <button
-                type="button"
-                className={`segment${sidebarMode === "files" ? " active" : ""}`}
-                title="文件"
-                aria-label="文件"
-                aria-pressed={sidebarMode === "files"}
-                onClick={() => selectSidebarMode("files")}
-              >
-                <Icon name="List" size={14} />
-              </button>
-              <button
-                type="button"
-                className={`segment${sidebarMode === "toc" ? " active" : ""}`}
-                title="目录"
-                aria-label="目录"
-                aria-pressed={sidebarMode === "toc"}
-                onClick={() => selectSidebarMode("toc")}
-              >
-                <Icon name="ListTree" size={14} />
-              </button>
-            </div>
+            <button
+              type="button"
+              className="segment"
+              title={switchTarget === "toc" ? "切换到目录" : "切换到文件"}
+              aria-label={switchTarget === "toc" ? "切换到目录" : "切换到文件"}
+              onClick={() => selectSidebarMode(switchTarget)}
+            >
+              {/* 目录侧用 lucide 原生 ListTree（注册键 ListTreeRaw；非 toolbar 的 ListTreeFramed 合成图标） */}
+              <Icon name={switchTarget === "toc" ? "ListTreeRaw" : "List"} size={14} />
+            </button>
           )}
           <OpenFolderButton />
         </div>

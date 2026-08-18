@@ -152,7 +152,10 @@ export const Icons = {
   AlertTriangle,
   Check,
   Palette,
+  // 注册表键 `ListTree` 指向合成图标 ListTreeFramed（toolbar 目录开关专用）；
+  // 原生 lucide ListTree 以 `ListTreeRaw` 键暴露（侧栏切换按钮使用）。
   ListTree: ListTreeFramed,
+  ListTreeRaw: ListTree,
   PanelLeft,
   PanelRight,
   RefreshCw,

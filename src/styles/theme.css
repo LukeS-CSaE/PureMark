@@ -181,4 +181,19 @@
   --acrylic: rgba(20, 25, 33, 0.6);
   --acrylic-strong: rgba(20, 25, 33, 0.8);
   --acrylic-border-top: rgba(255, 255, 255, 0.08);
+
+  /* Code highlighting palette — GitHub Dark（与浅色 §1.6 同源，
+   * highlight.css / live.css 消费同一组令牌，暗色下自动换色） */
+  --hl-comment: #8b949e;
+  --hl-keyword: #ff7b72;
+  --hl-string: #a5d6ff;
+  --hl-number: #79c0ff;
+  --hl-title: #d2a8ff;
+  --hl-type: #ffa657;
+  --hl-variable: #ffa657;
+  --hl-literal: #79c0ff;
+  --hl-meta: #8b949e;
+  --hl-symbol: #79c0ff;
+  --hl-addition: #7ee787;
+  --hl-deletion: #ffa198;
 }

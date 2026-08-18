@@ -18,9 +18,9 @@ const FONT_OPTIONS: { label: string; value: string }[] = [
 
 /** The three theme choices (iter2 B-1 debt, closed in iter2-ext T01). */
 const THEME_OPTIONS: { value: ThemePreference; label: string; icon: IconName }[] = [
+  { value: "auto", label: "跟随系统", icon: "MonitorCog" },
   { value: "light", label: "浅色", icon: "Sun" },
   { value: "dark", label: "深色", icon: "Moon" },
-  { value: "auto", label: "跟随系统", icon: "MonitorCog" },
 ];
 
 /** Left-hand directory of setting groups. */
@@ -211,15 +211,6 @@ export default function SettingsPanel() {
                     }}
                   />
                 </label>
-
-                <div className="settings-group settings-row">
-                  <span className="settings-row-label">显示滚动条</span>
-                  <Toggle
-                    label="显示滚动条"
-                    checked={config.showScrollbar}
-                    onChange={(v) => update({ showScrollbar: v })}
-                  />
-                </div>
               </>
             )}
 
@@ -247,7 +238,9 @@ export default function SettingsPanel() {
                 </div> */}
 
                 <div className="settings-group settings-row">
-                  <span className="settings-row-label">自动保存草稿</span>
+                  <span className="settings-row-label">
+                    自动保存草稿
+                  </span>
                   <Toggle
                     label="自动保存草稿"
                     checked={config.autoSave}
@@ -257,9 +250,23 @@ export default function SettingsPanel() {
 
                 <div className="settings-group settings-row">
                   <span className="settings-row-label">
-                    CodeMirror 源码编辑器
+                    显示滚动条
                     <span className="mt-1 block text-[11px] text-foreground-subtle">
-                      开启后视图栏新增「编辑」选项，使用 CodeMirror 源码视图（与实时/预览共享外壳样式）。
+                      关闭后隐藏全部滚动条（仍可滚动），界面更简洁。
+                    </span>
+                  </span>
+                  <Toggle
+                    label="显示滚动条"
+                    checked={config.showScrollbar}
+                    onChange={(v) => update({ showScrollbar: v })}
+                  />
+                </div>
+
+                <div className="settings-group settings-row">
+                  <span className="settings-row-label">
+                    文本编辑器
+                    <span className="mt-1 block text-[11px] text-foreground-subtle">
+                      开启后视图栏新增「编辑」选项，可编辑非渲染的文本。
                     </span>
                   </span>
                   <Toggle

@@ -1,0 +1,90 @@
+/* Code-block syntax highlighting (TipTap live / preview, via CodeBlockLowlight).
+ *
+ * lowlight emits `.hljs-*` classes as ProseMirror decorations; this file is the
+ * ONLY place that colours them. Every value comes from the `--hl-*` palette in
+ * `theme.css` — the same palette that `live.css` uses for CM6's `.cm-tok-*`,
+ * so the rendered views and the source view can never drift (design §1.6),
+ * and light/dark switching costs zero reconfiguration. */
+
+.hljs-comment,
+.hljs-quote,
+.hljs-doctag {
+  color: var(--hl-comment);
+}
+.hljs-comment,
+.hljs-quote {
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-tag,
+.hljs-name,
+.hljs-built_in,
+.hljs-deletion .hljs-title {
+  color: var(--hl-keyword);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-selector-class,
+.hljs-selector-id .hljs-string {
+  color: var(--hl-string);
+}
+
+.hljs-number,
+.hljs-literal {
+  color: var(--hl-literal);
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-title.class_,
+.hljs-section {
+  color: var(--hl-title);
+}
+
+.hljs-type,
+.hljs-class .hljs-title {
+  color: var(--hl-type);
+}
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-params,
+.hljs-attr {
+  color: var(--hl-variable);
+}
+
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link,
+.hljs-selector-id,
+.hljs-selector-attr {
+  color: var(--hl-symbol);
+}
+
+.hljs-meta,
+.hljs-selector-pseudo {
+  color: var(--hl-meta);
+}
+
+.hljs-addition {
+  color: var(--hl-addition);
+}
+.hljs-deletion {
+  color: var(--hl-deletion);
+}
+
+/* Markdown-ish emphasis inside highlighted code */
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
+}
+.hljs-link {
+  text-decoration: underline;
+}
