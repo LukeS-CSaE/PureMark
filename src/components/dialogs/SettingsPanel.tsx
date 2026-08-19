@@ -7,6 +7,10 @@ import type { ThemePreference, ViewMode } from "../../types";
 import Icon, { type IconName } from "../ui/Icon";
 import Toggle from "../ui/Toggle";
 import Select from "../ui/Select";
+// 版本号单一数据源：直接读 package.json（tsconfig resolveJsonModule 已开启）。
+import pkg from "../../../package.json";
+// 关于页图标：走 Vite 资源导入（与 Header logo 同模式），不用字符串路径。
+import aboutIcon from "../../assets/icon_transparent.png";
 
 const FONT_OPTIONS: { label: string; value: string }[] = [
   { label: "系统默认 (苹方)", value: DEFAULT_CONFIG.fontFamily },
@@ -28,6 +32,14 @@ const SECTIONS: { id: string; label: string; icon: IconName }[] = [
   { id: "appearance", label: "外观", icon: "Palette" },
   { id: "editor", label: "编辑器", icon: "Edit3" },
   { id: "shortcuts", label: "快捷键", icon: "Keyboard" },
+  { id: "about", label: "关于", icon: "Info" },
+];
+
+/** 关于页的只读信息行（版本号来自 package.json，不硬编码）。 */
+const ABOUT_ROWS: { label: string; value: string }[] = [
+  { label: "版本", value: `v${pkg.version}` },
+  // { label: "技术栈", value: "Tauri 2 · React · ProseMirror · CodeMirror 6" },
+  // { label: "存储方式", value: "本地优先，文档直接读写磁盘文件" },
 ];
 
 /** Supported shortcuts, grouped by scope. `Mod` matches Ctrl (Win) / ⌘ (Mac). */
@@ -56,6 +68,14 @@ const SHORTCUT_GROUPS: { title: string; items: { keys: string[]; label: string }
       { keys: ["Ctrl", "Alt", "5"], label: "五级标题" },
       { keys: ["Ctrl", "Alt", "6"], label: "六级标题" },
       { keys: ["Ctrl", "Alt", "0"], label: "清除标题" },
+    ],
+  },
+  {
+    title: "块操作",
+    items: [
+      { keys: ["Ctrl", "D"], label: "复制当前块到下方" },
+      { keys: ["Alt", "↑"], label: "上移当前块" },
+      { keys: ["Alt", "↓"], label: "下移当前块" },
     ],
   },
 ];
@@ -251,9 +271,9 @@ export default function SettingsPanel() {
                 <div className="settings-group settings-row">
                   <span className="settings-row-label">
                     显示滚动条
-                    <span className="mt-1 block text-[11px] text-foreground-subtle">
+                    {/* <span className="mt-1 block text-[11px] text-foreground-subtle">
                       关闭后隐藏全部滚动条（仍可滚动），界面更简洁。
-                    </span>
+                    </span> */}
                   </span>
                   <Toggle
                     label="显示滚动条"
@@ -301,6 +321,38 @@ export default function SettingsPanel() {
                   macOS 上 <kbd className="keycap">Ctrl</kbd> 对应{" "}
                   <kbd className="keycap">⌘</kbd> 键，功能一致。
                 </p> */}
+              </div>
+            )}
+
+            {active === "about" && (
+              <div className="about-page">
+                <div className="settings-group about-head">
+                  {/* <img src={aboutIcon} alt="PureMark" className="about-logo" /> */}
+                  <div>
+                    <span className="text-[16px] font-semibold tracking-tight">
+                      PureMark <span className="text-foreground-subtle">v{pkg.version}</span>
+                    </span>
+                    <span className="mt-1 block text-[12px] text-foreground-subtle">
+                      极简的 Markdown 编辑器
+                    </span>
+                  </div>
+                </div>
+
+                {ABOUT_ROWS.map((row) => (
+                  <div key={row.label} className="settings-group settings-row">
+                    <span className="settings-row-label">{row.label}</span>
+                    <span className="text-[12px] text-foreground-muted">{row.value}</span>
+                  </div>
+                ))}
+
+                <div className="settings-group">
+                  <span className="text-[11px] text-foreground-subtle">
+                    所见即所得的实时排版、字节级源码保留与防脏写保护，让写作专注、数据安心。
+                  </span>
+                </div>
+
+                {/* 右下角背景水印：左右翻转（scaleX(-1)），不拦截交互 */}
+                <img src={aboutIcon} alt="" aria-hidden className="about-bg" />
               </div>
             )}
           </div>

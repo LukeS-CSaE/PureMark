@@ -18,11 +18,13 @@ function mockKeyEvent(
   key: string,
   ctrlKey = false,
   metaKey = false,
+  altKey = false,
 ): KeyboardEvent {
   return {
     key,
     ctrlKey,
     metaKey,
+    altKey,
     preventDefault: vi.fn(),
   } as unknown as KeyboardEvent;
 }
@@ -79,6 +81,26 @@ describe("matchHotkey — modifier-less combos (F5)", () => {
   it("does not match a modifier-less combo when another key is pressed", () => {
     const cb = vi.fn();
     expect(matchHotkey({ "F5": cb }, mockKeyEvent("f"))).toBeNull();
+  });
+});
+
+describe("matchHotkey — Alt combos（块移动 Alt+↑/↓）", () => {
+  it("matches Alt+ArrowUp when altKey is set", () => {
+    const cb = vi.fn();
+    expect(matchHotkey({ "Alt+ArrowUp": cb }, mockKeyEvent("ArrowUp", false, false, true))).toBe(cb);
+  });
+
+  it("does not match Alt+ArrowUp when Alt is not held", () => {
+    expect(matchHotkey({ "Alt+ArrowUp": vi.fn() }, mockKeyEvent("ArrowUp"))).toBeNull();
+  });
+
+  it("is case-insensitive on the arrow key name", () => {
+    const cb = vi.fn();
+    expect(matchHotkey({ "Alt+ArrowDown": cb }, mockKeyEvent("arrowdown", false, false, true))).toBe(cb);
+  });
+
+  it("non-Alt combos do not match while Alt is held", () => {
+    expect(matchHotkey({ "Ctrl+F": vi.fn() }, mockKeyEvent("f", true, false, true))).toBeNull();
   });
 });
 

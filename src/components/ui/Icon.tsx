@@ -54,6 +54,7 @@ import {
   FolderPlus,
   Trash2,
   Pencil,
+  Info,
 } from "lucide-react";
 
 /**
@@ -168,6 +169,7 @@ export const Icons = {
   FolderPlus,
   Trash2,
   Pencil,
+  Info,
 } as const;
 
 export type IconName = keyof typeof Icons;

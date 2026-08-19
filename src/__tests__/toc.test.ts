@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { marked } from "marked";
-import { parseToc, slugify } from "../lib/toc";
+import { parseToc, resolveHeadingOrdinal, slugify } from "../lib/toc";
 
 describe("parseToc — headings", () => {
   it("extracts multi-level headings in document order", () => {
@@ -139,5 +139,27 @@ describe("parseToc vs marked — same heading set (fences skipped on both)", () 
       "Subsection",
       "Deep",
     ]);
+  });
+});
+
+describe("resolveHeadingOrdinal — 源码行号 → 标题序号", () => {
+  const md = ["# 一", "", "正文", "", "## 二", "", "```", "# 代码里的假标题", "```", "", "### 三"].join("\n");
+
+  it("首个标题返回 0", () => {
+    expect(resolveHeadingOrdinal(md, 1)).toBe(0);
+  });
+
+  it("后续标题按序返回 ordinal（跳过围栏内的 #）", () => {
+    expect(resolveHeadingOrdinal(md, 5)).toBe(1);
+    expect(resolveHeadingOrdinal(md, 11)).toBe(2);
+  });
+
+  it("非标题行 / 围栏内的 # 返回 null", () => {
+    expect(resolveHeadingOrdinal(md, 3)).toBeNull();
+    expect(resolveHeadingOrdinal(md, 8)).toBeNull();
+  });
+
+  it("空文档返回 null", () => {
+    expect(resolveHeadingOrdinal("", 1)).toBeNull();
   });
 });

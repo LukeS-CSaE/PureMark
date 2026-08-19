@@ -249,8 +249,15 @@ button {
   align-items: flex-end;
   gap: 4px;
   overflow-x: auto;
-  margin-left: 12px;
+  margin: 0 12px 4px 12px;
+  border-radius: var(--radius-lg);
   padding-bottom: 6px;
+  /* 隐藏横向滚动条：改用鼠标滚轮水平滚动（TabBar 组件把垂直
+     wheel 转成 scrollLeft，见 TabBar.tsx onWheel）。 */
+  scrollbar-width: none;
+}
+.tab-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-item {
@@ -689,6 +696,39 @@ button {
   display: block;
   padding: 14px 0;
   border-bottom: 1px solid var(--hairline);
+}
+/* 关于页头部：logo + 名称/简介横向排布 */
+.settings-group.about-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.about-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  flex: 0 0 auto;
+}
+/* 关于页容器：撑满可视高度，供右下角背景水印锚定 */
+.about-page {
+  position: relative;
+  min-height: 100%;
+}
+.about-page > * {
+  position: relative; /* 内容层在水印之上 */
+}
+/* 右下角翻转水印：scaleX(-1) 左右镜像；装饰性元素，不拦截交互 */
+.about-bg {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 110px;
+  height: auto;
+  transform: scaleX(-1);
+  opacity: 0.85;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
 }
 .settings-group:first-child {
   padding-top: 0;

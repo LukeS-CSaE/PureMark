@@ -57,11 +57,13 @@ export default function Sidebar() {
 
   // 文件⇄目录合并为单个切换按钮：图标/文案指向切换目标，点击在两种模式间翻转。
   const switchTarget: SidebarMode = sidebarMode === "files" ? "toc" : "files";
+  // TOC 开启且停靠左侧时，侧栏实际展示文档目录则标题随之替换。
+  const showingToc = showTocSwitch && sidebarMode === "toc";
 
   return (
     <aside className="app-sidebar" style={{ width: sidebarWidth }}>
       <div className="app-sidebar-head">
-        <span className="explorer-label">文件目录</span>
+        <span className="explorer-label">{showingToc ? "文档目录" : "文件目录"}</span>
         <div className="flex items-center gap-0.5">
           {showTocSwitch && (
             <button
@@ -79,7 +81,7 @@ export default function Sidebar() {
         </div>
       </div>
       <div className="file-card">
-        {showTocSwitch && sidebarMode === "toc" ? (
+        {showingToc ? (
           <TocPanel />
         ) : (
           <div className="file-scroll">

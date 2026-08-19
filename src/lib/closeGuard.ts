@@ -14,7 +14,21 @@ import type { EditorTab } from "../types";
 import { useTabsStore } from "../store/useTabsStore";
 import { useUIStore } from "../store/useUIStore";
 import { detectConflict, buildConflictViewModel } from "./conflictGuard";
+import { detachTab } from "./paneRouter";
 import { confirmClose, confirmUnsaved } from "../components/dialogs/UnsavedDialog";
+
+/**
+ * 提交一次关闭：移除 tab 后立即回收所有引用它的 pane（detachTab）。
+ *
+ * 修复「TabBar 选中态与编辑区内容不一致」：closeTab 只回退 activeId，
+ * 若不接 detachTab，持有该 tab 的 pane 仍指向已删除的 id，编辑区会
+ * 停留在旧内容（空白文档则表现为空白），须手动点击其它标签才恢复。
+ * 顺序敏感：detachTab 依赖 closeTab 已算好的回退后 activeId 作 fallback。
+ */
+function commitClose(id: string): void {
+  useTabsStore.getState().closeTab(id);
+  detachTab(id);
+}
 
 /** 标签级关闭守卫：脏则先检测冲突，再确认（含「查看冲突」）。 */
 export async function requestCloseTab(id: string): Promise<void> {
@@ -27,11 +41,11 @@ export async function requestCloseTab(id: string): Promise<void> {
       if (decision === "cancel") return;
       if (decision === "save") {
         await useTabsStore.getState().saveTab(id);
-        useTabsStore.getState().closeTab(id);
+        commitClose(id);
         return;
       }
       if (decision === "discard") {
-        useTabsStore.getState().closeTab(id);
+        commitClose(id);
         return;
       }
       // viewConflict → 打开冲突解决页，本次不关闭标签
@@ -42,7 +56,7 @@ export async function requestCloseTab(id: string): Promise<void> {
     const ok = await confirmUnsaved(tab.name);
     if (!ok) return;
   }
-  useTabsStore.getState().closeTab(id);
+  commitClose(id);
 }
 
 /**

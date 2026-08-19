@@ -24,7 +24,7 @@ export default function TocPanel() {
 
   return (
     <div className="toc-panel">
-      <div className="toc-head">目录</div>
+      {/* <div className="toc-head">目录</div> */}
       <div className="toc-scroll scroll-thin">
         <TocList items={items} onJump={jump} />
       </div>

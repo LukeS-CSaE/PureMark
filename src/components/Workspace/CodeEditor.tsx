@@ -24,6 +24,9 @@ import { useUIStore } from "../../store/useUIStore";
 import { useDocSync } from "../../hooks/useDocSync";
 import { focusPane } from "../../lib/paneRouter";
 import { registerScrollPane } from "../../lib/scrollSync";
+import { registerToc, unregisterToc } from "../../lib/tocRegistry";
+import { registerBlockOps, unregisterBlockOps } from "../../lib/blockOpsRegistry";
+import { cmDuplicateDown, cmMoveBlock } from "../../lib/cmBlockOps";
 import {
   createEditorState,
   darkCompartment,
@@ -176,6 +179,55 @@ export default function CodeEditor({ paneId, tabId }: CodeEditorProps) {
       getTabId: () => usePanesStore.getState().getPane(paneId)?.tabId ?? null,
     });
     return unregister;
+  }, [view, paneId]);
+
+  // ---- TOC adapter registration (目录点击跳转,edit 视图走 CM 行号语义) ----
+  useEffect(() => {
+    if (!view) return;
+    registerToc(paneId, {
+      getMarkdown: () => view.state.doc.toString(),
+      scrollToHeading(line) {
+        const lineInfo = view.state.doc.line(Math.min(Math.max(line, 1), view.state.doc.lines));
+        view.dispatch({
+          selection: { anchor: lineInfo.from },
+          effects: EditorView.scrollIntoView(lineInfo.from, { y: "start" }),
+        });
+      },
+    });
+    return () => unregisterToc(paneId);
+  }, [view, paneId]);
+
+  // ---- 块快捷键注册（Ctrl+D 复制 / Alt+↑·↓ 移动，窗口级热键驱动）----
+  // 源码视图以「空行分隔的段落」为块单位；操作后视口跟随光标。
+  useEffect(() => {
+    if (!view) return;
+    registerBlockOps(paneId, {
+      duplicate: () => {
+        const pos = view.state.selection.main.head;
+        const change = cmDuplicateDown(view.state, pos);
+        if (!change) return false;
+        view.dispatch({
+          changes: { from: change.from, to: change.to, insert: change.insert },
+          selection: { anchor: change.cursor },
+          effects: EditorView.scrollIntoView(change.cursor, { y: "center" }),
+        });
+        view.focus();
+        return true;
+      },
+      move: (dir) => {
+        const pos = view.state.selection.main.head;
+        const change = cmMoveBlock(view.state, pos, dir);
+        if (!change) return false;
+        view.dispatch({
+          changes: { from: change.from, to: change.to, insert: change.insert },
+          selection: { anchor: change.cursor },
+          effects: EditorView.scrollIntoView(change.cursor, { y: "center" }),
+        });
+        view.focus();
+        return true;
+      },
+    });
+    return () => unregisterBlockOps(paneId);
   }, [view, paneId]);
 
   return (

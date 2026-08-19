@@ -19,6 +19,7 @@ import TableRow from "@tiptap/extension-table-row";
 import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
 import { searchHighlight } from "./searchHighlight";
+import { blockHotkeys } from "./blockHotkeys";
 import { lowlight } from "../lowlight";
 
 export function buildEditorExtensions() {
@@ -46,6 +47,9 @@ export function buildEditorExtensions() {
     TableCell,
     // 搜索跳转高亮（live/preview 共用；用 decoration 而非 DOM 包裹，避免被 PM 撤销）。
     searchHighlight,
+    // 块级快捷键：Ctrl+D 复制块 / Alt+↑·↓ 移动块（触发在窗口级热键，见 App runBlockOps）/
+    // Ctrl+Shift+X 删除线（补齐设置登记但 TipTap 未内置的绑定）。
+    blockHotkeys,
   ];
   return extensions;
 }

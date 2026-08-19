@@ -145,6 +145,10 @@ export function closePane(paneId: PaneId): void {
  * Panes fall back to any other open document; if none is left they show the
  * empty state. When only one pane still holds a document the workspace
  * collapses back to `single` (PRD 4.3 boundary rule).
+ *
+ * 顺序敏感：必须在 closeTab 之后调用——fallback 用的正是 closeTab
+ * 回退后的 activeId。漏掉它会导致 pane 仍指向已删除 tab，编辑区
+ * 停留在旧内容而 TabBar 选中态已回退（两者脱节）。
  */
 export function detachTab(tabId: string): void {
   const panes = usePanesStore.getState();

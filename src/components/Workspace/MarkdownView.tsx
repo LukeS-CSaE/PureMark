@@ -25,7 +25,10 @@ import type { MarkdownSerializer } from "prosemirror-markdown";
 import { useTabsStore } from "../../store/useTabsStore";
 import { usePanesStore } from "../../store/usePanesStore";
 import { registerScrollPane } from "../../lib/scrollSync";
-import { parseToc } from "../../lib/toc";
+import { parseToc, resolveHeadingOrdinal } from "../../lib/toc";
+import { registerToc, unregisterToc } from "../../lib/tocRegistry";
+import { registerBlockOps, unregisterBlockOps } from "../../lib/blockOpsRegistry";
+import { duplicateBlockDown, moveBlock } from "../../lib/prosemirror/blockHotkeys";
 import { attachHeadingAnchors } from "../../lib/headingAnchors";
 import { focusPane } from "../../lib/paneRouter";
 import { registerEditor, unregisterEditor, type EditorHandle } from "../../lib/editorRegistry";
@@ -121,16 +124,20 @@ export default function MarkdownView({ paneId, tabId, editable }: Props) {
   // editable 时外部变更同样整体 setContent）。与 live 视图的回填逻辑同源。
   useEffect(() => {
     if (!editor || !editor.view) return;
-    if (content === lastWrittenRef.current) return;
-    lastWrittenRef.current = content;
-    try {
-      editor.commands.setContent(content || "", false);
-      // 只读视图挂载 TOC 标题锚点（可编辑视图因 PM 会重排 DOM 暂不挂载，沿用原 live 行为）。
-      if (!editable) {
-        attachHeadingAnchors(editor.view.dom as HTMLElement, parseToc(content));
+    if (content !== lastWrittenRef.current) {
+      lastWrittenRef.current = content;
+      try {
+        editor.commands.setContent(content || "", false);
+      } catch (err) {
+        console.error("[markdown-view] 回填内容失败（已吞掉，避免白屏）：", err);
       }
-    } catch (err) {
-      console.error("[markdown-view] 回填内容失败（已吞掉，避免白屏）：", err);
+    }
+    // 只读视图挂载 TOC 标题锚点（可编辑视图因 PM 会重排 DOM 暂不挂载，沿用原 live 行为）。
+    // 注意：必须独立于上面的内容变更 guard——live→preview 切换时编辑器重建，
+    // 但 lastWrittenRef 仍等于 store 内容（live 的 onUpdate 写过），guard 会跳过
+    // 本 effect 的剩余部分，导致新预览编辑器的标题没有 id、TOC 点击无法跳转。
+    if (!editable) {
+      attachHeadingAnchors(editor.view.dom as HTMLElement, parseToc(content));
     }
   }, [content, editor, editable]);
 
@@ -226,6 +233,73 @@ export default function MarkdownView({ paneId, tabId, editable }: Props) {
     registerEditor(paneId, handle);
     return () => unregisterEditor(paneId);
   }, [editor, paneId, tabId, editable, clearHighlight]);
+
+  // ── TOC 跳转:注册 TocAdapter,由 tocRouter.jumpToHeading 驱动 ──
+  // 此前整个代码库无人注册 adapter,导致「点击目录标题编辑区不跳转」。
+  // preview 走 tocRouter 的 DOM 锚点路径,不需要 adapter;
+  // live(及 CM 关闭时的 edit)在此注册。
+  useEffect(() => {
+    if (!editor || editable === false) return;
+    registerToc(paneId, {
+      getMarkdown: () =>
+        serializeCurrent(editor, originalDocRef.current, originalRef.current, serializerRef.current),
+      scrollToHeading(line) {
+        const view = editor.view;
+        if (!view) return;
+        const md = serializeCurrent(editor, originalDocRef.current, originalRef.current, serializerRef.current);
+        const ordinal = resolveHeadingOrdinal(md, line);
+        if (ordinal === null) return;
+        // 按文档顺序取第 ordinal 个标题节点(与 parseToc 的标题序对齐)。
+        let seen = 0;
+        let targetPos = -1;
+        view.state.doc.descendants((node, pos) => {
+          if (targetPos >= 0) return false;
+          if (node.type.name === "heading") {
+            if (seen === ordinal) targetPos = pos;
+            seen += 1;
+          }
+          return true;
+        });
+        if (targetPos < 0) return;
+        try {
+          // nodeDOM 直接返回标题节点对应的 DOM（domAtPos 在块前位置会返回
+          // 父容器+offset，滚动目标会错成整个编辑区）。
+          const dom = view.nodeDOM(targetPos);
+          const el =
+            dom instanceof HTMLElement ? dom : dom?.parentElement ?? null;
+          if (!el) return;
+          el.scrollIntoView({ block: "start" });
+          // 光标同步移到标题处（与 CM 源码视图的跳转行为一致）。
+          view.dispatch(
+            view.state.tr.setSelection(
+              TextSelection.near(view.state.doc.resolve(targetPos)),
+            ),
+          );
+        } catch {
+          // 边界失败则放弃跳转。
+        }
+      },
+    });
+    return () => unregisterToc(paneId);
+  }, [editor, paneId, editable]);
+
+  // ── 块快捷键：注册到 blockOpsRegistry，由 App 窗口级热键驱动 ──
+  // Ctrl+D 复制块 / Alt+↑·↓ 移动块。先 focus 再执行，
+  // 保证焦点在窗口内任意位置时操作都作用于当前 pane 的编辑器。
+  useEffect(() => {
+    if (!editor || editable === false) return;
+    registerBlockOps(paneId, {
+      duplicate: () => {
+        editor.view?.focus();
+        return duplicateBlockDown(editor);
+      },
+      move: (dir) => {
+        editor.view?.focus();
+        return moveBlock(editor, dir);
+      },
+    });
+    return () => unregisterBlockOps(paneId);
+  }, [editor, paneId, editable]);
 
   return (
     <div

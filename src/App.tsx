@@ -10,6 +10,7 @@ import { useTheme } from "./hooks/useTheme";
 import { shouldSuppressContextMenu } from "./lib/contextMenuGuard";
 import { openInFocusedPane, newUntitledInFocusedPane } from "./lib/paneRouter";
 import { requestCloseTab } from "./lib/closeGuard";
+import { getBlockOps } from "./lib/blockOpsRegistry";
 import { guardRefresh } from "./lib/refreshGuard";
 import { initFileWatchers } from "./lib/fileWatcher";
 import {
@@ -54,6 +55,32 @@ async function openFileFromAssociation(path: string) {
   } catch (err) {
     console.error("Failed to open file from association:", err);
   }
+}
+
+/**
+ * 块级快捷键入口（Ctrl+D / Alt+ArrowUp / Alt+ArrowDown）。
+ * 挂在窗口级而非编辑器 keymap：编辑器级绑定只有焦点恰好在可编辑区才
+ * 生效，且部分组合会被 WebView2 / 系统层吞掉；窗口级保证 focus 在
+ * PureMark 内即触发。句柄由各视图注册（见 blockOpsRegistry）：
+ * MarkdownView → TipTap 顶层块；CodeEditor → 空行分隔段落。
+ * 焦点在表单控件（设置面板输入框等）内时放行，避免误操作文档。
+ *
+ * 移动键历史：初版用 Ctrl+PageUp/PageDown，与 Windows 系统导航/选择
+ * 逻辑冲突；现改为 VS Code 风格的 Alt+↑ / Alt+↓，无系统级冲突。
+ */
+function runBlockOps(op: "duplicate" | "up" | "down"): void {
+  const el = document.activeElement;
+  if (
+    el instanceof HTMLInputElement ||
+    el instanceof HTMLTextAreaElement ||
+    el instanceof HTMLSelectElement
+  ) {
+    return;
+  }
+  const handle = getBlockOps(usePanesStore.getState().focusedPaneId);
+  if (!handle) return;
+  if (op === "duplicate") handle.duplicate();
+  else handle.move(op === "up" ? -1 : 1);
 }
 
 /**
@@ -156,6 +183,11 @@ export default function App() {
     "Ctrl+R": () => void guardRefresh(),
     "Cmd+R": () => void guardRefresh(),
     "F5": () => void guardRefresh(),
+    // 块操作：复制当前块到下方 / 上移 / 下移（窗口级，见 runBlockOps）。
+    "Ctrl+D": () => runBlockOps("duplicate"),
+    "Cmd+D": () => runBlockOps("duplicate"),
+    "Alt+ArrowUp": () => runBlockOps("up"),
+    "Alt+ArrowDown": () => runBlockOps("down"),
   });
 
   // 方案 B：启动实时文件监视（外部改动提示条）
