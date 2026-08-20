@@ -136,6 +136,7 @@ describe("RC-1 inflation replay — the literal original bug", () => {
 // startup gate is closed — reproducing the RC-2 feedback loop end to end.
 
 const setSize = vi.fn(async () => {});
+const setMinSize = vi.fn(async () => {});
 const center = vi.fn(async () => {});
 const maximize = vi.fn(async () => {});
 const isMaximized = vi.fn(async () => false);
@@ -161,6 +162,7 @@ const storeSetMock = vi.fn(async (_key: string, _value: unknown) => {});
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     setSize,
+    setMinSize,
     center,
     maximize,
     isMaximized,

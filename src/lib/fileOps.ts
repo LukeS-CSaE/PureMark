@@ -7,6 +7,7 @@
  */
 import { useUIStore } from "../store/useUIStore";
 import { useTabsStore } from "../store/useTabsStore";
+import { useConfigStore } from "../store/useConfigStore";
 import {
   renameFileCmd,
   deleteFileCmd,
@@ -92,6 +93,22 @@ export async function createDir(dir: string, name: string): Promise<void> {
 /** 在资源管理器中显示（Windows explorer /select，macOS open -R，Linux xdg-open）。 */
 export async function revealInExplorer(path: string): Promise<void> {
   await revealInExplorerCmd(path);
+}
+
+/**
+ * 把侧栏文件目录切换到指定文件夹（统一写入口）：重建树、写入 UI store、
+ * 持久化 lastFolder 并展开侧栏。供“打开文件夹”按钮、文件关联冷启动、
+ * 标签页右键“打开文件目录”共用，避免三处各自拼装。
+ */
+export async function switchFolderRoot(folder: string): Promise<void> {
+  try {
+    const tree = await buildTree(folder);
+    useUIStore.getState().setFolder(folder, tree);
+    useConfigStore.getState().update({ lastFolder: folder });
+    useUIStore.getState().setSidebarVisible(true);
+  } catch (err) {
+    console.error("[fileOps] 切换文件目录失败:", err);
+  }
 }
 
 /** 复制路径到系统剪贴板。 */

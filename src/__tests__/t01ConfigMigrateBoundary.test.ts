@@ -33,9 +33,9 @@ describe("migrateConfig — v2 blob WITHOUT the new iter2-ext fields", () => {
     defaultView: "preview",
   };
 
-  it("stamps configVersion 3", () => {
-    expect(CONFIG_VERSION).toBe(3);
-    expect(migrateConfig(V2_MINIMAL).configVersion).toBe(3);
+  it("stamps configVersion 4", () => {
+    expect(CONFIG_VERSION).toBe(4);
+    expect(migrateConfig(V2_MINIMAL).configVersion).toBe(4);
   });
 
   it("backfills every new field with its documented default", () => {

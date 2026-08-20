@@ -88,7 +88,7 @@ export interface AccentPreset {
   hover: string;
 }
 
-/** The seven shipped accents (design §3.2). Shared by light and dark themes. */
+/** The shipped accents (design §3.2). Shared by light and dark themes. */
 export const ACCENT_PRESETS: readonly AccentPreset[] = [
   { id: "azure", label: "蓝", primary: "#0071e3", hover: "#0066cc" },
   { id: "sky", label: "青", primary: "#0ea5e9", hover: "#0284c7" },
@@ -100,8 +100,21 @@ export const ACCENT_PRESETS: readonly AccentPreset[] = [
   { id: "pink", label: "粉", primary: "#ec4899", hover: "#db2777" },
 ] as const;
 
-/** Fallback used for every illegal input; equals the pre-iter2-ext colours. */
-export const DEFAULT_ACCENT: AccentPreset = ACCENT_PRESETS[0];
+/**
+ * Fallback used for every illegal input; equals the pre-iter2-ext colours
+ * (`sky`) — 注意不是列表首项，非法输入一律降级到历史默认色。
+ */
+export const DEFAULT_ACCENT: AccentPreset =
+  ACCENT_PRESETS.find((p) => p.id === "sky") ?? ACCENT_PRESETS[0];
+
+/**
+ * 主题色总数上限（内置预设 + 用户自定义）。设置面板据此限制新增，
+ * 迁移器据此截断超长的持久化列表。
+ */
+export const MAX_ACCENT_COUNT = 10;
+
+/** 用户可新增的自定义色槽位 = 总数上限 − 内置预设数。 */
+export const CUSTOM_ACCENT_SLOTS = MAX_ACCENT_COUNT - ACCENT_PRESETS.length;
 
 const ACCENT_IDS: readonly AccentId[] = [
   ...ACCENT_PRESETS.map((p) => p.id),
@@ -116,6 +129,35 @@ export function isAccentId(v: unknown): v is AccentId {
 /** Look a preset up by id. Returns `null` for `'custom'` and unknown ids. */
 export function getAccentPreset(id: AccentId): AccentPreset | null {
   return ACCENT_PRESETS.find((p) => p.id === id) ?? null;
+}
+
+/* ------------------------------------------------------------------ *
+ * 自定义主题色（新增 / 删除，总数 ≤ MAX_ACCENT_COUNT）
+ * 纯函数，供设置面板与 migrateConfig 共用。
+ * ------------------------------------------------------------------ */
+
+/** 归一化 hex：合法 `#rgb` / `#rrggbb` 返回小写 `#rrggbb`，否则 `null`。 */
+export function normalizeAccentHex(hex: unknown): string | null {
+  const rgb = typeof hex === "string" ? hexToRgb(hex) : null;
+  return rgb ? rgbToHex(rgb) : null;
+}
+
+/**
+ * 向自定义列表追加一个主题色。非法 hex、与内置预设重复、列表内重复、
+ * 超出剩余槽位时均原样返回（不追加）。始终返回新数组。
+ */
+export function appendCustomAccent(list: readonly string[], hex: unknown): string[] {
+  const norm = normalizeAccentHex(hex);
+  if (!norm) return [...list];
+  if (list.includes(norm)) return [...list];
+  if (ACCENT_PRESETS.some((p) => normalizeAccentHex(p.primary) === norm)) return [...list];
+  if (list.length >= CUSTOM_ACCENT_SLOTS) return [...list];
+  return [...list, norm];
+}
+
+/** 从自定义列表移除一个主题色；不存在时返回等值新数组。 */
+export function removeCustomAccent(list: readonly string[], hex: string): string[] {
+  return list.filter((h) => h !== hex);
 }
 
 export interface Rgb {

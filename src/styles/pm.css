@@ -113,6 +113,27 @@
   margin: 0 0 14px;
   color: var(--foreground-muted);
 }
+/* Tailwind v4 Preflight 全局重置了 list-style: none，导致列表只剩缩进
+   没有圆点/序号；此处显式还原（任务列表在下方用更高特异性规则覆盖）。 */
+.pm-editor ul {
+  list-style: disc;
+}
+.pm-editor ol {
+  list-style: decimal;
+}
+/* 嵌套列表切换标记样式，与常见排版一致。 */
+.pm-editor ul ul {
+  list-style: circle;
+}
+.pm-editor ul ul ul {
+  list-style: square;
+}
+
+/* 有序列表序号随主题色染色（::marker 仅作用于序号/圆点，不影响正文）。 */
+.pm-editor ol li::marker {
+  color: var(--primary);
+  font-weight: 600;
+}
 
 .pm-editor li {
   margin: 4px 0;
@@ -243,6 +264,14 @@
 }
 .pm-editor ul[data-type="taskList"] li > label {
   margin-top: 0.25em;
+}
+/* 任务列表复选框随主题色染色（accent-color 驱动勾选态/边框色）。 */
+.pm-editor ul[data-type="taskList"] input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
 }
 
 /* ---- Placeholder ---------------------------------------------------- */

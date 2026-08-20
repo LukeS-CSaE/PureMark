@@ -40,6 +40,7 @@ function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     // this fixture only needs them to type-check, no assertion depends on them.
     accent: "sky",
     accentCustom: null,
+    customAccents: [],
     tocVisible: false,
     tocPosition: "right",
     tocWidth: 220,

@@ -125,3 +125,101 @@ export function diffLines(a: string, b: string): DiffLine[] {
   }
   return out;
 }
+
+/** 带双侧行号的差异行（驱动代码差异对比视图，纯数据）。 */
+export interface DiffRow extends DiffLine {
+  /** 左侧（磁盘）行号（1 起）；该行仅存在于右侧时为空串。 */
+  leftNo: string;
+  /** 右侧（内存）行号（1 起）；该行仅存在于左侧时为空串。 */
+  rightNo: string;
+}
+
+/**
+ * 给 `diffLines` 的输出补上双侧行号（各自独立递增，缺失侧不占号）。
+ * 纯函数：渲染层直接 map 成代码差异对比视图的行。
+ */
+export function numberDiffRows(lines: readonly DiffLine[]): DiffRow[] {
+  const out: DiffRow[] = [];
+  let leftNo = 0;
+  let rightNo = 0;
+  for (const ln of lines) {
+    out.push({
+      ...ln,
+      leftNo: ln.left !== null ? String(++leftNo) : "",
+      rightNo: ln.right !== null ? String(++rightNo) : "",
+    });
+  }
+  return out;
+}
+
+/* -------------------------------------------------------------------------- */
+/* 差异分块与逐段取舍（冲突页箭头按钮：按块用磁盘内容覆盖 / 保留我的）       */
+/* -------------------------------------------------------------------------- */
+
+/** 逐段取舍：disk = 该块采用磁盘侧内容；mine = 保留内存侧内容。 */
+export type HunkChoice = "disk" | "mine";
+
+/** 一段连续差异块（equal 行之间的非 equal 行区间）。 */
+export interface DiffHunk {
+  /** 块首行在 `diffLines` 输出中的下标（含）。 */
+  rowStart: number;
+  /** 块末行下标 +1（不含）。 */
+  rowEnd: number;
+  /** 磁盘侧行内容（按序，不含仅右侧存在的行）。 */
+  diskRows: string[];
+  /** 内存侧行内容（按序，不含仅左侧存在的行）。 */
+  memoryRows: string[];
+}
+
+/**
+ * 把 `diffLines` 的输出按连续差异分块：相邻的 remove/add/modify 行归为同一块，
+ * equal 行作为分界。块下标即逐段取舍 `choices` 数组的下标。
+ */
+export function groupDiffHunks(lines: readonly DiffLine[]): DiffHunk[] {
+  const hunks: DiffHunk[] = [];
+  let cur: DiffHunk | null = null;
+  lines.forEach((ln, idx) => {
+    if (ln.kind === "equal") {
+      cur = null;
+      return;
+    }
+    if (!cur) {
+      cur = { rowStart: idx, rowEnd: idx, diskRows: [], memoryRows: [] };
+      hunks.push(cur);
+    }
+    cur.rowEnd = idx + 1;
+    if (ln.left !== null) cur.diskRows.push(ln.left);
+    if (ln.right !== null) cur.memoryRows.push(ln.right);
+  });
+  return hunks;
+}
+
+/**
+ * 按每块取舍合成合并结果的行：equal 行原样保留；已决块取所选一侧的行；
+ * 未决块默认保留内存侧（未处理 = 保留我的版本）。choices 短于块数时
+ * 超出部分视为未决。
+ */
+export function buildMergedLines(
+  lines: readonly DiffLine[],
+  hunks: readonly DiffHunk[],
+  choices: readonly (HunkChoice | null)[],
+): string[] {
+  const out: string[] = [];
+  let hunkIdx = 0;
+  let i = 0;
+  while (i < lines.length) {
+    const next = hunkIdx < hunks.length ? hunks[hunkIdx] : null;
+    if (next && i === next.rowStart) {
+      const choice = choices[hunkIdx] ?? null;
+      const rows = choice === "disk" ? next.diskRows : next.memoryRows;
+      out.push(...rows);
+      i = next.rowEnd;
+      hunkIdx += 1;
+      continue;
+    }
+    // 块外必为 equal 行（groupDiffHunks 与 diffLines 同源的不变式）。
+    out.push((lines[i].left ?? lines[i].right) as string);
+    i += 1;
+  }
+  return out;
+}

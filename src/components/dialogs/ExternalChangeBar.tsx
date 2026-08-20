@@ -2,9 +2,9 @@
  * 方案 B —— 外部改动非阻塞提示条（设计 §9 / T04）。
  *
  * 由 `useUIStore.externalChange` 驱动，从文件监视（fileWatcher）触发。
- * 提供三个动作：
- *  - [查看冲突] → 打开左右分屏冲突解决页；
- *  - [重新加载] → reloadFromDisk（丢弃内存，载入磁盘）；
+ * 提供两个动作：
+ *  - [查看差异] → 打开代码差异对比页（含「采用磁盘版本」，
+ *                 取代原提示条上的独立「重新加载」按钮）；
  *  - [忽略]     → 重置磁盘基线（不再提示本次改动，保留内存编辑）。
  */
 import { useUIStore } from "../../store/useUIStore";
@@ -17,11 +17,6 @@ export default function ExternalChangeBar() {
   if (!notice) return null;
 
   const ui = useUIStore.getState();
-
-  async function handleReload(): Promise<void> {
-    await useTabsStore.getState().reloadFromDisk(notice!.path, notice!.diskContent);
-    ui.dismissExternalChange();
-  }
 
   async function handleIgnore(): Promise<void> {
     const sig = await captureDiskState(notice!.path);
@@ -51,10 +46,7 @@ export default function ExternalChangeBar() {
       <span className="ext-bar-text">「{notice.name}」已在外部被修改</span>
       <div className="ext-bar-actions">
         <button type="button" className="ext-bar-btn primary" onClick={() => void handleViewConflict()}>
-          查看冲突
-        </button>
-        <button type="button" className="ext-bar-btn" onClick={() => void handleReload()}>
-          重新加载
+          查看差异
         </button>
         <button type="button" className="ext-bar-btn subtle" onClick={() => void handleIgnore()}>
           忽略

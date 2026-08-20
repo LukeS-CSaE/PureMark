@@ -197,30 +197,33 @@
   line-height: 1.6;
   color: var(--foreground-muted);
 }
-.conflict-cols {
+/* 差异对比区：单滚动容器 + 逐行双栏网格（左右天然对齐、同步滚动）。 */
+.conflict-diff {
   flex: 1 1 auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
   min-height: 0;
-}
-.conflict-col {
   display: flex;
   flex-direction: column;
-  min-height: 0;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--surface-2);
 }
-.conflict-col-title {
+/* 双栏标题行（左 = 磁盘版本，右 = 当前编辑内容）。 */
+.conflict-col-head {
   flex: none;
-  padding: 8px 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   font-size: 12px;
   font-weight: 600;
   color: var(--foreground-muted);
   background: var(--surface);
   border-bottom: 1px solid var(--hairline);
+}
+.conflict-col-head span {
+  padding: 8px 12px;
+}
+.conflict-col-head span + span {
+  border-left: 1px solid var(--hairline);
 }
 .conflict-pre {
   flex: 1 1 auto;
@@ -234,11 +237,116 @@
   color: var(--foreground);
 }
 .diff-row {
-  padding: 0 12px;
+  display: flex;
+  padding: 0 12px 0 0;
   min-height: 1.6em;
 }
-.diff-hl {
-  background: rgba(0, 113, 227, 0.1);
+/* 双侧行号槽（各自独立递增，缺失侧不占号）。 */
+.diff-ln {
+  flex: none;
+  width: 3.2em;
+  padding-right: 0.8em;
+  text-align: right;
+  color: var(--foreground-muted);
+  opacity: 0.65;
+  user-select: none;
+}
+/* 左（磁盘）侧被改/被删行：红。 */
+.diff-del {
+  background: rgba(248, 81, 73, 0.14);
+}
+.diff-del .diff-ln {
+  color: rgba(248, 81, 73, 0.9);
+  opacity: 1;
+}
+/* 右（内存）侧新增/修改行：绿。 */
+.diff-ins {
+  background: rgba(46, 160, 67, 0.14);
+}
+.diff-ins .diff-ln {
+  color: rgba(46, 160, 67, 0.95);
+  opacity: 1;
+}
+/* 仅另一侧存在的行：灰色斜纹占位，保持左右对齐。 */
+.diff-empty {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(128, 128, 128, 0.06),
+    rgba(128, 128, 128, 0.06) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+/* 一行差异 = 左右两格网格，缺失侧由 .diff-empty 占位保持对齐。 */
+.diff-grid-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.diff-grid-row > .diff-row + .diff-row {
+  border-left: 1px solid var(--hairline);
+}
+/* 差异块取舍操作条：← 用磁盘内容覆盖此段 / 保留我的此段内容 →。 */
+.diff-hunk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 4px 12px;
+  background: var(--surface);
+  border-top: 1px dashed var(--hairline);
+  border-bottom: 1px dashed var(--hairline);
+}
+.diff-hunk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  font-size: 11px;
+  color: var(--foreground-muted);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.diff-hunk-btn:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.diff-hunk-btn svg {
+  flex: none;
+}
+/* 已取舍块的合并行：横跨两栏，弱化绿色 + ✓，点击可撤销。 */
+.diff-resolved {
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 6px;
+  background: rgba(46, 160, 67, 0.07);
+  cursor: pointer;
+}
+.diff-resolved svg {
+  flex: none;
+  color: rgba(46, 160, 67, 0.95);
+}
+.diff-resolved:hover {
+  background: rgba(46, 160, 67, 0.14);
+}
+/* 标题栏变更统计（+n −m）。 */
+.conflict-stat {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+.diff-stat-ins {
+  color: rgba(46, 160, 67, 0.95);
+}
+.diff-stat-del {
+  color: rgba(248, 81, 73, 0.9);
 }
 .conflict-actions {
   display: flex;

@@ -29,6 +29,11 @@ import type { WindowGeometry } from "../types";
 /**
  * Minimum window size in **logical** pixels.
  *
+ * ⚠️ `height` is the hard runtime minimum. `width` is ONLY the conf-level
+ * initial constraint: the runtime minimum width is dynamic — one third of
+ * the current screen width (`minWindowWidth`), applied via `setMinSize` in
+ * `applyStartupGeometry`.
+ *
  * ⚠️ Single source of truth: `src-tauri/tauri.conf.json` must declare exactly
  * `minWidth: 960` / `minHeight: 480`. `windowGeometry.test.ts` reads the config
  * file and asserts equality so the two can never drift apart again (RC-4).
@@ -38,6 +43,18 @@ import type { WindowGeometry } from "../types";
  * 560 minimum physically unsatisfiable and forces the window off-screen.
  */
 export const WINDOW_MIN = { width: 960, height: 480 } as const;
+
+/**
+ * Runtime minimum window width = one third of the screen width (logical px).
+ *
+ * Pure rounding, with a floor of 1px so degenerate inputs never produce a
+ * non-positive constraint. Callers pass either the full screen width or the
+ * work-area width — the difference (taskbar) is negligible for a 1/3 ratio.
+ */
+export function minWindowWidth(screenWidth: number): number {
+  if (!isPositiveFinite(screenWidth)) return 1;
+  return Math.max(1, Math.round(screenWidth / 3));
+}
 
 /** Fallback size used when there is no usable persisted record. */
 export const WINDOW_DEFAULT = { width: 1400, height: 900 } as const;
@@ -166,8 +183,9 @@ function normalizeWork(work: WorkArea | null | undefined): WorkArea {
  *
  * @param raw  Whatever came out of the settings store.
  * @param work Optional work area (logical px). When supplied, the record is
- *             additionally clamped to fit the screen and raised to
- *             `WINDOW_MIN` (subject to the small-screen fallback).
+ *             additionally clamped to fit the screen and raised to the minimum
+ *             (dynamic width via `minWindowWidth`, fixed `WINDOW_MIN.height`,
+ *             both subject to the small-screen fallback).
  * @returns The record, or `null` when it is missing / malformed / unmarked.
  *          `null` is the self-heal path for users upgrading from a build that
  *          persisted PhysicalSize: the stale value is dropped, not rescaled.
@@ -190,7 +208,7 @@ export function parsePersistedGeometry(
   return {
     schema: 2,
     unit: "logical",
-    width: clampAxis(raw.width, WINDOW_MIN.width, w.width),
+    width: clampAxis(raw.width, minWindowWidth(w.width), w.width),
     height: clampAxis(raw.height, WINDOW_MIN.height, w.height),
     maximized: raw.maximized,
   };
@@ -212,7 +230,7 @@ export function parsePersistedGeometry(
  * | valid && `maximized === true`        | `'maximized'` | clamped (kept for restore)  |
  * | valid && size > work × 1.5           | `'default'`   | clamp(1400×900) + warn      |
  * | valid && size > work − MARGIN        | `'clamped'`   | clamp to work − MARGIN      |
- * | valid && size < WINDOW_MIN           | `'raised'`    | raised to WINDOW_MIN        |
+ * | valid && size < minimum              | `'raised'`    | raised to the minimum       |
  * | valid && inside the band             | `'remembered'`| verbatim                    |
  *
  * @param remembered Raw persisted value (unvalidated on purpose).
@@ -225,7 +243,7 @@ export function computeStartupGeometry(
   const area = normalizeWork(work);
 
   const fallback = (): StartupGeometry => ({
-    width: clampAxis(WINDOW_DEFAULT.width, WINDOW_MIN.width, area.width),
+    width: clampAxis(WINDOW_DEFAULT.width, minWindowWidth(area.width), area.width),
     height: clampAxis(WINDOW_DEFAULT.height, WINDOW_MIN.height, area.height),
     maximize: false,
     source: "default",
@@ -235,7 +253,7 @@ export function computeStartupGeometry(
   const record = parsePersistedGeometry(remembered);
   if (!record) return fallback();
 
-  const width = clampAxis(record.width, WINDOW_MIN.width, area.width);
+  const width = clampAxis(record.width, minWindowWidth(area.width), area.width);
   const height = clampAxis(record.height, WINDOW_MIN.height, area.height);
 
   // Row 2 — maximized wins; the size is still computed so that un-maximizing
@@ -259,7 +277,7 @@ export function computeStartupGeometry(
 
   const maxW = effectiveMax(area.width);
   const maxH = effectiveMax(area.height);
-  const minW = effectiveMin(WINDOW_MIN.width, area.width);
+  const minW = effectiveMin(minWindowWidth(area.width), area.width);
   const minH = effectiveMin(WINDOW_MIN.height, area.height);
 
   // Row 4 — does not fit on this monitor. Takes priority over row 5 because the

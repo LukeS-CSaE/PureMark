@@ -185,6 +185,12 @@ export interface AppConfig {
   accent: AccentId;
   /** Custom primary hex for `accent === 'custom'` (P1 / N-20); P0 keeps it null. */
   accentCustom: string | null;
+  /**
+   * 用户新增的自定义主题色列表（归一化小写 hex）。内置预设 + 本列表
+   * 总数 ≤ 10（见 theme.ts `MAX_ACCENT_COUNT`）；选中某项时 `accent`
+   * 置 `'custom'` 且 `accentCustom` 存对应 hex。默认为空。
+   */
+  customAccents: string[];
   /** Outline panel visibility; defaults to `false`. */
   tocVisible: boolean;
   /** Outline panel position; defaults to `'right'`. */

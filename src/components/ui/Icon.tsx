@@ -4,6 +4,7 @@ import {
   Minus,
   Square,
   X,
+  Plus,
   FolderOpen,
   PanelLeftClose,
   PanelLeftOpen,
@@ -34,6 +35,7 @@ import {
   Eye,
   Search,
   Settings,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   ArrowUp,
@@ -55,6 +57,7 @@ import {
   Trash2,
   Pencil,
   Info,
+  FolderTree,
 } from "lucide-react";
 
 /**
@@ -116,6 +119,7 @@ export const Icons = {
   Minus,
   Square,
   X,
+  Plus,
   FolderOpen,
   PanelLeftClose,
   PanelLeftOpen,
@@ -146,6 +150,7 @@ export const Icons = {
   Eye,
   Search,
   Settings,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   ArrowUp,
@@ -170,6 +175,7 @@ export const Icons = {
   Trash2,
   Pencil,
   Info,
+  FolderTree,
 } as const;
 
 export type IconName = keyof typeof Icons;

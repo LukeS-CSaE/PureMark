@@ -1,8 +1,14 @@
-import { useState, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import { useConfigStore, DEFAULT_CONFIG } from "../../store/useConfigStore";
 import { useUIStore } from "../../store/useUIStore";
 import { usePanesStore } from "../../store/usePanesStore";
-import { ACCENT_PRESETS } from "../../lib/theme";
+import {
+  ACCENT_PRESETS,
+  MAX_ACCENT_COUNT,
+  appendCustomAccent,
+  normalizeAccentHex,
+  removeCustomAccent,
+} from "../../lib/theme";
 import type { ThemePreference, ViewMode } from "../../types";
 import Icon, { type IconName } from "../ui/Icon";
 import Toggle from "../ui/Toggle";
@@ -94,6 +100,43 @@ export default function SettingsPanel() {
 
   const [active, setActive] = useState("appearance");
 
+  // 新增主题色：隐藏的原生取色器，由“+”色板按钮触发。
+  const colorInputRef = useRef<HTMLInputElement>(null);
+  const canAddAccent =
+    ACCENT_PRESETS.length + config.customAccents.length < MAX_ACCENT_COUNT;
+
+  /** 取色器选定一个 hex：命中已有色则直接选中，否则追加并选中。 */
+  function pickCustomHex(raw: string): void {
+    const hex = normalizeAccentHex(raw);
+    if (!hex) return;
+    const preset = ACCENT_PRESETS.find((p) => normalizeAccentHex(p.primary) === hex);
+    if (preset) {
+      update({ accent: preset.id });
+      return;
+    }
+    if (config.customAccents.includes(hex)) {
+      update({ accent: "custom", accentCustom: hex });
+      return;
+    }
+    if (!canAddAccent) return;
+    update({
+      customAccents: appendCustomAccent(config.customAccents, hex),
+      accent: "custom",
+      accentCustom: hex,
+    });
+  }
+
+  /** 删除一个自定义主题色；若正在使用则回退到默认色。 */
+  function removeAccent(hex: string): void {
+    const next = removeCustomAccent(config.customAccents, hex);
+    const isActive = config.accent === "custom" && config.accentCustom === hex;
+    update(
+      isActive
+        ? { customAccents: next, accent: DEFAULT_CONFIG.accent, accentCustom: null }
+        : { customAccents: next },
+    );
+  }
+
   function close() {
     setConfigOpen(false);
   }
@@ -156,7 +199,9 @@ export default function SettingsPanel() {
                 </div>
 
                 <div className="settings-group">
-                  <span className="settings-group-title">主题色</span>
+                  <span className="settings-group-title">
+                    主题色（{ACCENT_PRESETS.length + config.customAccents.length}/{MAX_ACCENT_COUNT}）
+                  </span>
                   <div className="flex flex-wrap items-center gap-2">
                     {ACCENT_PRESETS.map((preset) => {
                       const on = config.accent === preset.id;
@@ -175,6 +220,52 @@ export default function SettingsPanel() {
                         </button>
                       );
                     })}
+                    {config.customAccents.map((hex) => {
+                      const on = config.accent === "custom" && config.accentCustom === hex;
+                      return (
+                        <span key={hex} className="accent-swatch-wrap">
+                          <button
+                            type="button"
+                            className={`accent-swatch${on ? " active" : ""}`}
+                            style={{ background: hex }}
+                            aria-label={`自定义主题色 ${hex}`}
+                            aria-pressed={on}
+                            title={hex}
+                            onClick={() => update({ accent: "custom", accentCustom: hex })}
+                          >
+                            {on && <Icon name="Check" size={13} strokeWidth={3} />}
+                          </button>
+                          <button
+                            type="button"
+                            className="swatch-remove"
+                            title="删除该主题色"
+                            aria-label={`删除主题色 ${hex}`}
+                            onClick={() => removeAccent(hex)}
+                          >
+                            <Icon name="X" size={9} strokeWidth={3} />
+                          </button>
+                        </span>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      className="accent-swatch accent-add"
+                      title={canAddAccent ? "新增主题色" : `主题色已达上限（${MAX_ACCENT_COUNT}）`}
+                      aria-label="新增主题色"
+                      disabled={!canAddAccent}
+                      onClick={() => colorInputRef.current?.click()}
+                    >
+                      <Icon name="Plus" size={13} />
+                    </button>
+                    {/* 隐藏取色器：点“+”后弹出系统调色板 */}
+                    <input
+                      ref={colorInputRef}
+                      type="color"
+                      className="hidden"
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      onChange={(e) => pickCustomHex(e.target.value)}
+                    />
                   </div>
                 </div>
 

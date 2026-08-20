@@ -25,6 +25,7 @@ import type { MarkdownSerializer } from "prosemirror-markdown";
 import { useTabsStore } from "../../store/useTabsStore";
 import { usePanesStore } from "../../store/usePanesStore";
 import { registerScrollPane } from "../../lib/scrollSync";
+import { rememberScrollPosition, recallScrollPosition } from "../../lib/scrollMemory";
 import { parseToc, resolveHeadingOrdinal } from "../../lib/toc";
 import { registerToc, unregisterToc } from "../../lib/tocRegistry";
 import { registerBlockOps, unregisterBlockOps } from "../../lib/blockOpsRegistry";
@@ -81,14 +82,41 @@ export default function MarkdownView({ paneId, tabId, editable }: Props) {
   const currentTabRef = useRef<string | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 滚动进度记忆（与 CodeEditor 设计 §8.2 同源）：切走时快照、切回时恢复，
+  // 避免 TipTap 重建后 scrollTop 被清零、切回文档只能从头再滚。
+  const scrollByTabRef = useRef(new Map<string, number>());
+  /** 待恢复滚动位置的 tabId（tab / 视图切换时置位，内容回填 effect 消费）。 */
+  const pendingScrollRestoreRef = useRef<string | null>(null);
+  const lastEditableRef = useRef(editable);
+
   // tab 切换时重置保真基准（与旧 live 视图同源）。
   if (tabId && currentTabRef.current !== tabId) {
+    // 先快照上一个文档的滚动进度，再换 tab。
+    if (currentTabRef.current && scrollRef.current) {
+      rememberScrollPosition(
+        scrollByTabRef.current,
+        currentTabRef.current,
+        scrollRef.current.scrollTop,
+      );
+    }
+    pendingScrollRestoreRef.current = tabId;
     currentTabRef.current = tabId;
     const tab = useTabsStore.getState().tabs.find((t) => t.id === tabId);
     originalRef.current = tab ? tab.content : "";
     originalDocRef.current = null;
     serializerRef.current = null;
     lastWrittenRef.current = null;
+  }
+
+  // 同一文档的 live↔preview 切换同样会重建编辑器、清空滚动，一并快照/恢复。
+  if (lastEditableRef.current !== editable) {
+    lastEditableRef.current = editable;
+    if (tabId) {
+      if (scrollRef.current) {
+        rememberScrollPosition(scrollByTabRef.current, tabId, scrollRef.current.scrollTop);
+      }
+      pendingScrollRestoreRef.current = tabId;
+    }
   }
 
   const editor = useEditor(
@@ -131,6 +159,14 @@ export default function MarkdownView({ paneId, tabId, editable }: Props) {
       } catch (err) {
         console.error("[markdown-view] 回填内容失败（已吞掉，避免白屏）：", err);
       }
+    }
+    // 内容就位后恢复切走前的滚动进度（仅 tab / 视图切换后的首次回填，
+    // 后续外部变更不会误把用户当前滚动位置拽回去）。
+    if (tabId && pendingScrollRestoreRef.current === tabId) {
+      pendingScrollRestoreRef.current = null;
+      const restored = recallScrollPosition(scrollByTabRef.current, tabId);
+      if (scrollRef.current) scrollRef.current.scrollTop = restored;
+      usePanesStore.getState().setPaneScroll(paneId, restored);
     }
     // 只读视图挂载 TOC 标题锚点（可编辑视图因 PM 会重排 DOM 暂不挂载，沿用原 live 行为）。
     // 注意：必须独立于上面的内容变更 guard——live→preview 切换时编辑器重建，

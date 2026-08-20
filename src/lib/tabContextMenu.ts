@@ -7,7 +7,8 @@
 import type { EditorTab, MenuItem } from "../types";
 import { useTabsStore } from "../store/useTabsStore";
 import { requestCloseTab } from "../lib/closeGuard";
-import { copyPath, revealInExplorer } from "../lib/fileOps";
+import { copyPath, revealInExplorer, switchFolderRoot } from "../lib/fileOps";
+import { dirOf } from "../lib/pathUtils";
 
 /** 构造标签页菜单项。 */
 export function buildTabMenu(tab: EditorTab): MenuItem[] {
@@ -33,6 +34,15 @@ export function buildTabMenu(tab: EditorTab): MenuItem[] {
       icon: "FolderOpen",
       disabled: !hasPath,
       run: () => void revealInExplorer(tab.path),
+    },
+    {
+      // 主动把侧栏文件目录切换到该 tab 文件所在文件夹：运行中从资源管理器
+      // 打开新文件不再自动切目录，由本菜单项按需触发（见 App.tsx open-file）。
+      id: "openFolder",
+      label: "切换到该文件的目录",
+      icon: "FolderTree",
+      disabled: !hasPath,
+      run: () => void switchFolderRoot(dirOf(tab.path)),
     },
   ];
 }

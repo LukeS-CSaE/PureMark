@@ -251,7 +251,7 @@ button {
   overflow-x: auto;
   margin: 0 12px 4px 12px;
   border-radius: var(--radius-lg);
-  padding-bottom: 6px;
+
   /* 隐藏横向滚动条：改用鼠标滚轮水平滚动（TabBar 组件把垂直
      wheel 转成 scrollLeft，见 TabBar.tsx onWheel）。 */
   scrollbar-width: none;
@@ -520,6 +520,49 @@ button {
   box-shadow:
     0 0 0 2px var(--surface),
     0 0 0 4px var(--ring);
+}
+
+/* 自定义主题色外层：悬停时右上角露出删除角标。 */
+.accent-swatch-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.swatch-remove {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 14px;
+  height: 14px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--surface);
+  background: #ef4444;
+  color: #ffffff;
+  cursor: pointer;
+  z-index: 1;
+}
+.accent-swatch-wrap:hover .swatch-remove {
+  display: inline-flex;
+}
+
+/* “+”新增主题色按钮：虚线空心圆，与预设色板同尺寸。 */
+.accent-swatch.accent-add {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--border-subtle);
+  color: var(--foreground-muted);
+}
+.accent-swatch.accent-add:hover:not(:disabled) {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+.accent-swatch.accent-add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* Icon button primitive */

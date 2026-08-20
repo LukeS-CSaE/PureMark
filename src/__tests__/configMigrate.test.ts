@@ -200,9 +200,9 @@ describe("migrateConfig — v2 -> v3 (iter2-ext fields)", () => {
     autoSaveDelay: 1500,
   };
 
-  it("stamps configVersion 3", () => {
-    expect(CONFIG_VERSION).toBe(3);
-    expect(migrateConfig(V2_BLOB).configVersion).toBe(3);
+  it("stamps configVersion 4", () => {
+    expect(CONFIG_VERSION).toBe(4);
+    expect(migrateConfig(V2_BLOB).configVersion).toBe(4);
   });
 
   it("backfills every new field with its default", () => {
