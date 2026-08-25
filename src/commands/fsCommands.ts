@@ -98,6 +98,11 @@ export async function writeFileText(path: string, content: string): Promise<void
   await writeTextFile(path, content);
 }
 
+/** 写入二进制文件（剪贴板图片保存），自动创建父目录。 */
+export async function writeBinaryFile(path: string, data: Uint8Array): Promise<void> {
+  await invoke("write_binary_file", { path, data: Array.from(data) });
+}
+
 /**
  * 读取文件元信息（mtime / size），封装 `@tauri-apps/plugin-fs` 的 `stat()`。
  * 用于 `diskSignature` 的 O(1) 快检与冲突检测（设计 §1.2 / D3）。

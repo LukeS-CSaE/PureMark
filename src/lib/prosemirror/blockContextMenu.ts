@@ -6,6 +6,7 @@
  *   顶层块粒度，事务可撤销（undo 栈一致）。
  * - 表格行操作直接复用 @tiptap/extension-table 的 addRowBefore /
  *   addRowAfter / deleteRow 命令（`.can()` 决定禁用态）。
+ * - 表格列操作直接复用 addColumnBefore / addColumnAfter 命令。
  * - 纯函数 `isInTable` 拆出供单测（无需 DOM / Editor 实例）。
  */
 import type { Editor } from "@tiptap/core";
@@ -58,7 +59,7 @@ function setSelectionAt(tr: import("@tiptap/pm/state").Transaction, pos: number)
   return tr.setSelection(TextSelection.create(tr.doc, pos));
 }
 
-/** 构造 live 视图右键菜单：块级插入/删除 + 表格行操作（在表格内时追加）。 */
+/** 构造 live 视图右键菜单：块级插入/删除 + 表格行列操作（在表格内时追加）。 */
 export function buildBlockMenu(editor: Editor): MenuItem[] {
   const inTable = isInTable(editor.state);
   const items: MenuItem[] = [
@@ -106,6 +107,21 @@ export function buildBlockMenu(editor: Editor): MenuItem[] {
         icon: "Trash2",
         disabled: !editor.can().deleteRow(),
         run: () => void editor.chain().focus().deleteRow().run(),
+      },
+      { separator: true, id: "sep-table-col" },
+      {
+        id: "add-col-left",
+        label: "在左侧插入列",
+        icon: "ArrowLeft",
+        disabled: !editor.can().addColumnBefore(),
+        run: () => void editor.chain().focus().addColumnBefore().run(),
+      },
+      {
+        id: "add-col-right",
+        label: "在右侧插入列",
+        icon: "ArrowRight",
+        disabled: !editor.can().addColumnAfter(),
+        run: () => void editor.chain().focus().addColumnAfter().run(),
       },
     );
   }

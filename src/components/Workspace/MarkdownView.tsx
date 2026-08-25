@@ -38,6 +38,7 @@ import { searchHighlightKey } from "../../lib/prosemirror/searchHighlight";
 import { buildMarkdownSerializer, serializeNodeToMarkdown } from "../../lib/prosemirror/markdownSerializer";
 import { serializeSourcePreserving } from "../../lib/prosemirror/sourcePreserving";
 import { buildBlockMenu } from "../../lib/prosemirror/blockContextMenu";
+import { handleImagePaste } from "../../lib/pasteImage";
 import { useUIStore } from "../../store/useUIStore";
 import type { PaneId } from "../../types";
 import "../../styles/pm.css";
@@ -127,7 +128,39 @@ export default function MarkdownView({ paneId, tabId, editable }: Props) {
       // 只读/SSR 渲染：显式 false 让 tipTap 在挂载后（useEffect）再实例化编辑器，
       // 规避开发期 "SSR detected" 告警并防止 hydration 不匹配。
       immediatelyRender: false,
-      editorProps: { attributes: { class: "pm-editor" } },
+      editorProps: {
+        attributes: { class: "pm-editor" },
+        // 图片粘贴拦截：检测到剪贴板含图片时保存为本地文件并插入 markdown 图片语法。
+        // 未保存文档（tab.path 为空）不拦截，回退为浏览器默认粘贴行为。
+        handlePaste: (view, event) => {
+          if (!editable || !tabId) return false;
+          const tab = useTabsStore.getState().tabs.find((t) => t.id === tabId);
+          if (!tab?.path) return false;
+          const clipData = event.clipboardData;
+          if (!clipData) return false;
+          // 同步检测是否含图片，无图片则不拦截（返回 false 让 TipTap 默认处理文本粘贴）。
+          let hasImg = false;
+          for (let i = 0; i < clipData.items.length; i++) {
+            if (clipData.items[i].kind === "file" && clipData.items[i].type.startsWith("image/")) {
+              hasImg = true;
+              break;
+            }
+          }
+          if (!hasImg) return false;
+          // 有图片：阻止默认粘贴，异步保存后插入。
+          // 注意：不能用 editor 闭包（useEditor 首渲染时为 null），直接用 view 参数。
+          event.preventDefault();
+          handleImagePaste(clipData, tab.path)
+            .then((relPath) => {
+              if (!relPath) return;
+              const imageNode = view.state.schema.nodes.image?.create({ src: relPath });
+              if (!imageNode) return;
+              view.dispatch(view.state.tr.replaceSelectionWith(imageNode));
+            })
+            .catch((err) => console.error("[paste-image] 保存失败：", err));
+          return true;
+        },
+      },
       onUpdate: ({ editor }) => {
         if (!editable || !tabId) return;
         const md = serializeCurrent(editor, originalDocRef.current, originalRef.current, serializerRef.current);

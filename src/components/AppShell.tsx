@@ -7,6 +7,7 @@ import SettingsPanel from "./dialogs/SettingsPanel";
 import UnsavedDialog from "./dialogs/UnsavedDialog";
 import ConflictResolvePage from "./dialogs/ConflictResolvePage";
 import ExternalChangeBar from "./dialogs/ExternalChangeBar";
+import RenamePopover from "./dialogs/RenamePopover";
 import ContextMenu from "./ContextMenu";
 import { useUIStore } from "../store/useUIStore";
 import { useConfigStore } from "../store/useConfigStore";
@@ -37,6 +38,9 @@ export default function AppShell() {
       <ExternalChangeBar />
       <UnsavedDialog />
       <ConflictResolvePage />
+
+      {/* 重命名弹层（替代 window.prompt） */}
+      <RenamePopover />
 
       {/* 需求2：自定义右键菜单（受 useUIStore.contextMenu 驱动，portal 至 body） */}
       <ContextMenu />

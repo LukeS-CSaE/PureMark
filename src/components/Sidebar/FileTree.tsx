@@ -1,9 +1,11 @@
-import { useState, type MouseEvent } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import { useUIStore } from "../../store/useUIStore";
 import { useTabsStore } from "../../store/useTabsStore";
+import { useConfigStore } from "../../store/useConfigStore";
 import { readFileTextWithEncoding } from "../../commands/fsCommands";
 import { openInFocusedPane } from "../../lib/paneRouter";
 import { buildFileMenu } from "../../lib/fileContextMenu";
+import { sortFileNodes } from "../../lib/fileSort";
 import type { FileNode } from "../../types";
 import Icon from "../ui/Icon";
 
@@ -13,7 +15,11 @@ export default function FileTree() {
   const activePath = useTabsStore(
     (s) => s.tabs.find((t) => t.id === s.activeId)?.path ?? "",
   );
+  const sortOrder = useConfigStore((s) => s.config.fileSortOrder);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  // 按当前排序方式对文件树进行排序（目录始终在文件之前）
+  const sortedTree = useMemo(() => sortFileNodes(tree, sortOrder), [tree, sortOrder]);
 
   async function handleOpenFile(node: FileNode) {
     // 编码自动检测（UTF-8 / GBK / GB2312 / Big5 / UTF-16），保存时按原编码写回。
@@ -38,7 +44,7 @@ export default function FileTree() {
     });
   }
 
-  if (tree.length === 0) {
+  if (sortedTree.length === 0) {
     return (
       <div className="px-2 py-3 text-[12px] text-foreground-subtle">
         
@@ -61,7 +67,9 @@ export default function FileTree() {
               <Icon name={isOpen ? "ChevronDown" : "ChevronRight"} size={14} />
               <span className="flex-1 truncate text-[13px]">{node.name}</span>
             </div>
-            {isOpen && node.children ? <div>{renderNodes(node.children)}</div> : null}
+            {isOpen && node.children ? (
+              <div>{renderNodes(sortFileNodes(node.children, sortOrder))}</div>
+            ) : null}
           </div>
         );
       }
@@ -80,5 +88,5 @@ export default function FileTree() {
       );
     });
 
-  return <div className="file-tree">{renderNodes(tree)}</div>;
+  return <div className="file-tree">{renderNodes(sortedTree)}</div>;
 }

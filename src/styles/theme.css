@@ -47,6 +47,11 @@
   --muted: #f1f2f4;
   --muted-foreground: #6e6e73;
 
+  /* Warning (rename extension-change notice) */
+  --warning: #b45309;
+  --warning-bg: #fff7e6;
+  --warning-border: rgba(245, 158, 11, 0.5);
+
   /* Radius scale — keep sm/md/lg, add Apple tiers */
   --radius-sm: 4px;
   --radius-md: 8px;
@@ -196,4 +201,9 @@
   --hl-symbol: #79c0ff;
   --hl-addition: #7ee787;
   --hl-deletion: #ffa198;
+
+  /* Warning (rename extension-change notice) */
+  --warning: #fbbf24;
+  --warning-bg: rgba(245, 158, 11, 0.12);
+  --warning-border: rgba(245, 158, 11, 0.4);
 }

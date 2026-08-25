@@ -3,7 +3,7 @@
  *
  * 文件 / 目录节点分别构造不同菜单；写操作经 fileOps 真实调用 Rust 命令
  * （rename_file / delete_file / create_file / create_dir / reveal_in_explorer）。
- * 重命名 / 新建用 window.prompt 取名称（Tauri WebView 可用；后续可换自定义弹窗）。
+ * 重命名 / 新建通过自定义 RenamePopover 取名称。
  */
 import type { FileNode, MenuItem } from "../types";
 import { useUIStore } from "../store/useUIStore";
@@ -35,21 +35,33 @@ async function openDir(path: string): Promise<void> {
   }
 }
 
-function promptRename(path: string, name: string): void {
-  const next = window.prompt("重命名", name);
-  if (next && next.trim() && next.trim() !== name) {
-    void renameFile(path, next);
-  }
+/** 打开重命名弹层（文件隐藏扩展名，目录显示完整名）。 */
+function promptRename(node: FileNode): void {
+  useUIStore.getState().openRename({
+    title: "重命名",
+    defaultValue: node.name,
+    // 仅文件节点允许隐藏扩展名；目录无扩展名，始终显示完整名。
+    canHideExtension: !node.isDir,
+    onSubmit: (newName) => void renameFile(node.path, newName),
+  });
 }
 
+/** 打开新建文件弹层。 */
 function promptCreateFile(dir: string): void {
-  const name = window.prompt("新建文件名", "未命名.md");
-  if (name && name.trim()) void createFile(dir, name);
+  useUIStore.getState().openRename({
+    title: "新建文件",
+    defaultValue: "未命名.md",
+    onSubmit: (name) => void createFile(dir, name),
+  });
 }
 
+/** 打开新建文件夹弹层。 */
 function promptCreateDir(dir: string): void {
-  const name = window.prompt("新建文件夹名", "新建文件夹");
-  if (name && name.trim()) void createDir(dir, name);
+  useUIStore.getState().openRename({
+    title: "新建文件夹",
+    defaultValue: "新建文件夹",
+    onSubmit: (name) => void createDir(dir, name),
+  });
 }
 
 async function confirmDelete(path: string, name: string): Promise<void> {
@@ -69,7 +81,7 @@ export function buildFileMenu(node: FileNode): MenuItem[] {
       { id: "newDir", label: "新建文件夹", icon: "FolderPlus", run: () => promptCreateDir(node.path) },
       { id: "copyPath", label: "复制路径", icon: "Copy", run: () => void copyPath(node.path) },
       { separator: true, id: "sep-file-dir" },
-      { id: "rename", label: "重命名", icon: "Pencil", run: () => promptRename(node.path, node.name) },
+      { id: "rename", label: "重命名", icon: "Pencil", run: () => promptRename(node) },
       { id: "delete", label: "删除", icon: "Trash2", run: () => void confirmDelete(node.path, node.name) },
     ];
   }
@@ -83,7 +95,7 @@ export function buildFileMenu(node: FileNode): MenuItem[] {
     },
     { id: "copyPath", label: "复制路径", icon: "Copy", run: () => void copyPath(node.path) },
     { separator: true, id: "sep-file" },
-    { id: "rename", label: "重命名", icon: "Pencil", run: () => promptRename(node.path, node.name) },
+    { id: "rename", label: "重命名", icon: "Pencil", run: () => promptRename(node) },
     { id: "delete", label: "删除", icon: "Trash2", run: () => void confirmDelete(node.path, node.name) },
   ];
 }

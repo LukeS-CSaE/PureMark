@@ -9,6 +9,7 @@
 import { create } from "zustand";
 import type {
   FileNode,
+  RenameState,
   ResolvedTheme,
   SidebarMode,
   UnsavedDialogState,
@@ -42,10 +43,17 @@ interface UIState {
 
   /** 自定义右键菜单状态（需求2）：非空时渲染 <ContextMenu/>。 */
   contextMenu: ContextMenuState | null;
+  /** 重命名弹层状态：非空时渲染 <RenamePopover/>。 */
+  rename: RenameState | null;
   /** 打开自定义菜单（编辑器 / 文件树 / 标签页）。 */
   openContextMenu(state: ContextMenuState): void;
   /** 关闭自定义菜单。 */
   closeContextMenu(): void;
+
+  /** 打开重命名弹层。 */
+  openRename(state: RenameState): void;
+  /** 关闭重命名弹层。 */
+  closeRename(): void;
 
   setResolvedTheme(t: ResolvedTheme): void;
   toggleSidebar(): void;
@@ -78,6 +86,7 @@ export const useUIStore = create<UIState>((set) => ({
   conflictView: null,
   externalChange: null,
   contextMenu: null,
+  rename: null,
 
   setResolvedTheme: (t) => set((s) => (s.resolvedTheme === t ? s : { resolvedTheme: t })),
   toggleSidebar: () => set((s) => ({ sidebarVisible: !s.sidebarVisible })),
@@ -97,4 +106,7 @@ export const useUIStore = create<UIState>((set) => ({
 
   openContextMenu: (state) => set({ contextMenu: state }),
   closeContextMenu: () => set({ contextMenu: null }),
+
+  openRename: (state) => set({ rename: state }),
+  closeRename: () => set({ rename: null }),
 }));

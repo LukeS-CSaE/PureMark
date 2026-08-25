@@ -9,7 +9,7 @@ import {
   normalizeAccentHex,
   removeCustomAccent,
 } from "../../lib/theme";
-import type { ThemePreference, ViewMode } from "../../types";
+import type { FileSortOrder, ThemePreference, ViewMode } from "../../types";
 import Icon, { type IconName } from "../ui/Icon";
 import Toggle from "../ui/Toggle";
 import Select from "../ui/Select";
@@ -24,6 +24,15 @@ const FONT_OPTIONS: { label: string; value: string }[] = [
   { label: "宋体 (Serif)", value: '"SimSun", "Songti SC", serif' },
   { label: "雅黑 (YaHei)", value: '"Microsoft YaHei", "PingFang SC", sans-serif' },
   { label: "PingFang SC", value: '"PingFang SC"' },
+];
+
+/** 文件树排序选项。 */
+const SORT_OPTIONS: { value: FileSortOrder; label: string }[] = [
+  { value: "name-asc", label: "名称 A→Z" },
+  { value: "name-desc", label: "名称 Z→A" },
+  { value: "type", label: "类型" },
+  { value: "modified-desc", label: "修改时间（最新在前）" },
+  { value: "modified-asc", label: "修改时间（最早在前）" },
 ];
 
 /** The three theme choices (iter2 B-1 debt, closed in iter2-ext T01). */
@@ -269,17 +278,17 @@ export default function SettingsPanel() {
                   </div>
                 </div>
 
-                <label className="settings-group">
+                <div className="settings-group settings-row">
                   <span className="settings-group-title">字体</span>
                   <Select
-                    className="w-full"
+                    className="w-1/3"
                     value={config.fontFamily}
                     options={FONT_OPTIONS}
                     onChange={(v) => update({ fontFamily: v })}
                   />
-                </label>
+                </div>
 
-                <label className="settings-group">
+                <label className="settings-group setting-row">
                   <span className="settings-group-title">字号（{config.fontSize}px）</span>
                   <input
                     type="range"
@@ -287,7 +296,7 @@ export default function SettingsPanel() {
                     max={22}
                     value={config.fontSize}
                     onChange={(e) => update({ fontSize: Number(e.target.value) })}
-                    className="range w-full"
+                    className="range"
                     style={
                       {
                         "--fill": `${((config.fontSize - 12) / 10) * 100}%`,
@@ -296,10 +305,10 @@ export default function SettingsPanel() {
                   />
                 </label>
 
-                <label className="settings-group">
+                <label className="settings-group settings-row">
                   <span className="settings-group-title">默认视图</span>
                   <Select
-                    className="w-full"
+                    className="w-1/3"
                     value={config.defaultView}
                     options={[
                       { label: "编辑", value: "edit" },
@@ -336,6 +345,31 @@ export default function SettingsPanel() {
                       useUIStore.getState().setSidebarVisible(v);
                       update({ sidebarVisible: v });
                     }}
+                  />
+                </div>
+
+                <div className="settings-group settings-row">
+                  <span className="settings-row-label">文件排序方式</span>
+                  {/* <span className="settings-group-title">文件排序方式</span> */}
+                  <Select
+                    className="w-1/4"
+                    value={config.fileSortOrder}
+                    options={SORT_OPTIONS.map((o) => ({ label: o.label, value: o.value }))}
+                    onChange={(v) => update({ fileSortOrder: v as FileSortOrder })}
+                  />
+                </div>
+
+                <div className="settings-group settings-row">
+                  <span className="settings-row-label">
+                    重命名时显示扩展名
+                    <span className="mt-1 block text-[11px] text-foreground-subtle">
+                      关闭时仅编辑文件名主名，扩展名自动保留；开启后可一并修改扩展名，变更时实时提示。
+                    </span>
+                  </span>
+                  <Toggle
+                    label="重命名时显示扩展名"
+                    checked={config.showExtensionOnRename}
+                    onChange={(v) => update({ showExtensionOnRename: v })}
                   />
                 </div>
 
@@ -436,11 +470,6 @@ export default function SettingsPanel() {
                   </div>
                 ))}
 
-                <div className="settings-group">
-                  <span className="text-[11px] text-foreground-subtle">
-                    所见即所得的实时排版、字节级源码保留与防脏写保护，让写作专注、数据安心。
-                  </span>
-                </div>
 
                 {/* 右下角背景水印：左右翻转（scaleX(-1)），不拦截交互 */}
                 <img src={aboutIcon} alt="" aria-hidden className="about-bg" />

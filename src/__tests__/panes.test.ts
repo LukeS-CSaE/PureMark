@@ -50,6 +50,8 @@ function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     useProseMirrorLive: false,
     useCodeMirrorSource: false,
     showScrollbar: true,
+    fileSortOrder: "name-asc",
+    showExtensionOnRename: false,
     ...overrides,
   };
 }

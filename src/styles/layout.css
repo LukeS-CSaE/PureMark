@@ -250,7 +250,7 @@ button {
   gap: 4px;
   overflow-x: auto;
   margin: 0 12px 4px 12px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
 
   /* 隐藏横向滚动条：改用鼠标滚轮水平滚动（TabBar 组件把垂直
      wheel 转成 scrollLeft，见 TabBar.tsx onWheel）。 */
@@ -683,7 +683,6 @@ button {
   padding: 2px 20px 22px;
 }
 .settings-nav {
-  /* 去卡片化：左栏作为轻量导航，不再浮起为卡片 */
   flex: 0 0 22%;            /* 宽度按弹窗宽度百分比，不再写死像素 */
   min-width: 150px;         /* 极窄弹窗时仍保证可读、可用 */
   max-width: 220px;
@@ -962,8 +961,9 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-left: auto;
   gap: 8px;
-  width: 100%;
+  /* width: 100%; */
   background: var(--surface);
   border: 1px solid var(--input);
   border-radius: var(--radius-md);

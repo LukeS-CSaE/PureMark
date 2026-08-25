@@ -16,6 +16,7 @@ import { create } from "zustand";
 import type {
   AccentId,
   AppConfig,
+  FileSortOrder,
   ThemePreference,
   TocPosition,
   ViewMode,
@@ -62,6 +63,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   useProseMirrorLive: true,
   useCodeMirrorSource: false,
   showScrollbar: true,
+  fileSortOrder: "name-asc",
+  showExtensionOnRename: false,
 };
 
 /* ------------------------------------------------------------------ *
@@ -157,6 +160,14 @@ function readTocWidth(v: unknown): number {
   return Math.min(TOC_WIDTH_MAX, Math.max(TOC_WIDTH_MIN, Math.round(n)));
 }
 
+const SORT_ORDERS: FileSortOrder[] = ["name-asc", "name-desc", "type", "modified-desc", "modified-asc"];
+
+function readFileSortOrder(v: unknown): FileSortOrder {
+  return typeof v === "string" && (SORT_ORDERS as string[]).includes(v)
+    ? (v as FileSortOrder)
+    : DEFAULT_CONFIG.fileSortOrder;
+}
+
 function readPaneViewModes(v: unknown, defaultView: ViewMode): [ViewMode, ViewMode] {
   if (Array.isArray(v) && v.length >= 2) {
     return [
@@ -213,6 +224,8 @@ export function migrateConfig(raw: unknown): AppConfig {
       useProseMirrorLive: readBoolean(r.useProseMirrorLive, DEFAULT_CONFIG.useProseMirrorLive),
       useCodeMirrorSource: readBoolean(r.useCodeMirrorSource, DEFAULT_CONFIG.useCodeMirrorSource),
       showScrollbar: readBoolean(r.showScrollbar, DEFAULT_CONFIG.showScrollbar),
+      fileSortOrder: readFileSortOrder(r.fileSortOrder),
+      showExtensionOnRename: readBoolean(r.showExtensionOnRename, DEFAULT_CONFIG.showExtensionOnRename),
     };
   } catch (err) {
     console.warn("[config] migration failed, falling back to defaults:", err);

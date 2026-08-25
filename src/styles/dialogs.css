@@ -221,6 +221,10 @@
 }
 .conflict-col-head span {
   padding: 8px 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .conflict-col-head span + span {
   border-left: 1px solid var(--hairline);
@@ -281,6 +285,11 @@
 .diff-grid-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
+}
+.diff-grid-row > .diff-row {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .diff-grid-row > .diff-row + .diff-row {
   border-left: 1px solid var(--hairline);
@@ -361,6 +370,113 @@
   .unsaved-card,
   .conflict-page,
   .ext-bar {
+    animation: none;
+  }
+}
+
+/* ---- 重命名弹层（替代 window.prompt） ---- */
+.rename-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.18);
+  z-index: 60;
+}
+.rename-popover {
+  width: 40%;
+  padding: 16px 18px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-3);
+  animation: popover-in 0.24s var(--ease-spring) both;
+}
+.rename-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.rename-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.rename-head .btn-icon {
+  margin-left: auto;
+}
+.rename-input {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--foreground);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.rename-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-soft);
+}
+.rename-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--warning);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-md);
+}
+.rename-warn-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.rename-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+.rename-btn {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--foreground-muted);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.rename-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--foreground);
+}
+.rename-btn.primary {
+  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.rename-btn.primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+.rename-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rename-popover {
     animation: none;
   }
 }

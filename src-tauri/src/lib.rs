@@ -17,6 +17,8 @@ struct FileNode {
     is_dir: bool,
     children: Option<Vec<FileNode>>,
     depth: i32,
+    /// 文件最后修改时间（毫秒时间戳），用于按时间排序。
+    mtime_ms: u64,
 }
 
 /* ---- 非 UTF-8 中文文档读写（encoding_rs） ----------------------------------
@@ -194,11 +196,21 @@ fn build_node(path: &str, depth: i32) -> Vec<FileNode> {
             continue;
         }
 
+        // 获取修改时间（毫秒），失败时回退 0。
+        let mtime_ms = entry
+            .metadata()
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64)
+            .unwrap_or(0);
+
         let is_dir = pbuf.is_dir();
         if is_dir {
             let children = build_node(&pbuf.to_string_lossy().to_string(), depth + 1);
             // Only keep directories that actually contain Markdown files.
             if !children.is_empty() {
+                // 目录的 mtime 取其子项中最新的修改时间，确保排序一致。
+                let dir_mtime = children.iter().map(|c| c.mtime_ms).max().unwrap_or(mtime_ms);
                 dirs.push(FileNode {
                     id: pbuf.to_string_lossy().to_string(),
                     name: file_name,
@@ -206,6 +218,7 @@ fn build_node(path: &str, depth: i32) -> Vec<FileNode> {
                     is_dir: true,
                     children: Some(children),
                     depth,
+                    mtime_ms: dir_mtime,
                 });
             }
         } else {
@@ -222,6 +235,7 @@ fn build_node(path: &str, depth: i32) -> Vec<FileNode> {
                     is_dir: false,
                     children: None,
                     depth,
+                    mtime_ms,
                 });
             }
         }
@@ -298,6 +312,16 @@ fn create_dir(path: String) -> Result<(), String> {
     fs::create_dir_all(Path::new(&path)).map_err(|e| e.to_string())
 }
 
+/// 写入二进制文件（用于保存剪贴板粘贴的图片），自动创建父目录。
+#[tauri::command]
+fn write_binary_file(path: String, data: Vec<u8>) -> Result<(), String> {
+    let p = Path::new(&path);
+    if let Some(parent) = p.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::write(p, data).map_err(|e| e.to_string())
+}
+
 /// 在资源管理器中显示文件 / 目录（跨平台尽力实现）。
 #[tauri::command]
 fn reveal_in_explorer(path: String) {
@@ -354,6 +378,7 @@ pub fn run() {
             delete_file,
             create_file,
             create_dir,
+            write_binary_file,
             reveal_in_explorer,
             read_text_auto,
             write_text_enc
