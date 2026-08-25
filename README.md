@@ -1,57 +1,28 @@
 # PureMark
 
-> A minimal, local-first Markdown editor. No accounts. No cloud sync. No telemetry. Just writing.
+> 一个有点好看，但非常非常纯粹的md编辑器，没有ai、没有账号。本地写写，本地改改。
 
-[![Built with Tauri](https://img.shields.io/badge/Built%20with-Tauri%202-24C8D8?logo=tauri&logoColor=white)](https://tauri.app)
-[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)](https://react.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-v4-38B2AC?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-
----
+![Built with Tauri](https://img.shields.io/badge/Built%20with-Tauri%202-24C8D8?logo=tauri&logoColor=white)![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?logo=typescript&logoColor=white)![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-v4-38B2AC?logo=tailwindcss&logoColor=white)![License](https://img.shields.io/badge/License-MIT-green)---
 
 ## Screenshots
 
-<!-- TODO: Add actual screenshots here -->
-*Coming soon*
-
----
+![alt text](image-1.png)---
 
 ## Features
 
 ### Editing
 
-- **Dual editor engines** — CodeMirror 6 for source editing, TipTap / ProseMirror for live WYSIWYG rendering
-- **Three view modes** per pane — `edit` (source with syntax highlighting) / `live` (Typora-style real-time rendering) / `preview` (read-only)
-- **Split view** — side-by-side panes with independent view modes; edit the same file or two different files
-- **Multi-tab** — open, switch, close documents; unsaved tabs show a dirty indicator
-- **Clipboard image paste** — `Ctrl+V` an image, it saves to `assets/` and inserts the relative path automatically
-- **Table context menu** — right-click inside a table to insert rows above/below, delete rows, insert columns left/right
-- **Block operations** — `Ctrl+D` to duplicate a block, `Alt+↑` / `Alt+↓` to move it
-- **In-app search** — `Ctrl+F` with match highlighting and scroll-to-match in all views
+- **实时编辑** - 支持在编辑的时候直接预览效果，不是双屏的哪一种
+- **基本文档功能** - 具备编辑编写markdown的基本功能，文件树、目录、快捷键、搜索等。想要其他功能可以clone下来自己做，反正开源的。
+- **现代设计风格** - 卡片加亚克力材质，支持切换或自定义主题色
+- **快捷键小设计** - 支持`Ctrl+D` 复制一行, `Alt+↑` / `Alt+↓` 上下行移动，copy idea来的
 
 ### File Management
 
-- **File tree sidebar** — browse folders, filter `.md` / `.markdown` only, resizable
-- **File associations** — double-click a `.md` file to open it in PureMark (single-instance, focuses existing window)
-- **Auto-save drafts** — local draft saving protects against accidental loss; `Ctrl+S` writes back to the original file
-- **External change detection** — watches open files for disk modifications, shows a conflict bar, and offers a diff view for resolution
-- **Non-UTF-8 encoding support** — auto-detects GBK / GB2312 / GB18030 / Big5 / UTF-16 and preserves the original encoding on save
-
-### Appearance
-
-- **Acrylic blur window** — frameless window with native DWM blur on Windows
-- **Light / Dark / Auto** themes — follows system preference by default
-- **7 accent colors** — sky, blue, green, purple, orange, red, pink; instantly applied and persisted
-- **Custom titlebar** — minimal, draggable, with native window controls
-- **Window geometry memory** — restores exact size, position, and maximized state across restarts
-
-### Other
-
-- **TOC (Table of Contents)** — auto-parsed from headings, click to jump, supports left/right panel position
-- **Status bar** — live line/column, word count, character count, encoding, and language
-- **Scroll position memory** — per-tab scroll restoration when switching between documents and views
-- **Scroll sync** — synchronized scrolling between edit and preview in split mode
+- **文件树侧栏** — 只显示markdown文件
+- **默认打开** — 支持设为windows打开markdown的默认app，macos没试过，因为主包还买不起
+- **文件冲突** — 可以查看文件内容冲突，适合人和ai一起处理一个文档时使用
+- **多种中文编码** — 自动匹配 GBK / GB2312 / GB18030 / Big5 / UTF-16
 
 ---
 
@@ -93,7 +64,7 @@ The built executable will be in `src-tauri/target/release/`.
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
-|----------|--------|
+| --- | --- |
 | `Ctrl+S` | Save file |
 | `Ctrl+N` | New document |
 | `Ctrl+W` | Close current tab |
@@ -108,7 +79,7 @@ The built executable will be in `src-tauri/target/release/`.
 ## Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
+| --- | --- |
 | Desktop shell | [Tauri 2](https://tauri.app) (Rust + WebView2) |
 | Frontend | [React 18](https://react.dev) + [TypeScript 5.5](https://www.typescriptlang.org) |
 | Build | [Vite 5](https://vitejs.dev) |
@@ -123,6 +94,7 @@ The built executable will be in `src-tauri/target/release/`.
 ### Rust Backend
 
 Custom Tauri commands:
+
 - `build_tree` — recursive directory scan for Markdown files
 - `read_text_auto` — encoding-aware text reading (GBK/Big5/UTF-16 auto-detection)
 - `write_text_enc` — encoding-preserving text writing
@@ -133,7 +105,7 @@ Custom Tauri commands:
 
 ## Project Structure
 
-```
+```plaintext
 prueMd/
 ├── src/                          # Frontend (React + TypeScript)
 │   ├── components/

@@ -9,7 +9,7 @@
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "tiptap-markdown";
 import Link from "@tiptap/extension-link";
-import Image from "@tiptap/extension-image";
+import { LocalImage } from "./extensionImageLocal";
 import Placeholder from "@tiptap/extension-placeholder";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import TaskList from "@tiptap/extension-task-list";
@@ -22,7 +22,12 @@ import { searchHighlight } from "./searchHighlight";
 import { blockHotkeys } from "./blockHotkeys";
 import { lowlight } from "../lowlight";
 
-export function buildEditorExtensions() {
+/**
+ * @param documentDir 当前文档所在目录（绝对路径），用于把相对图片路径
+ *   解析为 WebView 可加载的 asset URL；默认空串（单测 / 未保存文档时
+ *   不转换，图片路径原样输出）。详见 extensionImageLocal.ts。
+ */
+export function buildEditorExtensions(documentDir = "") {
   const extensions = [
     // 关闭内置 codeBlock，改用 CodeBlockLowlight（同名节点，schema 不变）。
     StarterKit.configure({ codeBlock: false }),
@@ -33,7 +38,7 @@ export function buildEditorExtensions() {
     // markdownSerializer.ts 的表格单元格逻辑负责（<br> 拼接 + 列表前缀）。
     Markdown.configure({ html: true, transformPastedText: true, transformCopiedText: true }),
     Link.configure({ openOnClick: false }),
-    Image,
+    LocalImage.configure({ documentDir }),
     // 空文档时显示占位提示（.pm-editor .is-empty::before 消费 data-placeholder）。
     Placeholder.configure({ placeholder: "···" }),
     TaskList,

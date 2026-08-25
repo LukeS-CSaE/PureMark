@@ -1,9 +1,14 @@
-import { useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { useConfigStore, DEFAULT_CONFIG } from "../../store/useConfigStore";
 import { useUIStore } from "../../store/useUIStore";
 import { usePanesStore } from "../../store/usePanesStore";
+// react-color 的 BlockPicker 取代原生 <input type="color"> 作为主题色取色器。
+import { BlockPicker } from "react-color";
+
 import {
   ACCENT_PRESETS,
+  DEFAULT_ACCENT,
   MAX_ACCENT_COUNT,
   appendCustomAccent,
   normalizeAccentHex,
@@ -109,10 +114,66 @@ export default function SettingsPanel() {
 
   const [active, setActive] = useState("appearance");
 
-  // 新增主题色：隐藏的原生取色器，由“+”色板按钮触发。
-  const colorInputRef = useRef<HTMLInputElement>(null);
+  // 新增主题色：react-color 的 BlockPicker 弹层，由“+”色板按钮触发。
   const canAddAccent =
     ACCENT_PRESETS.length + config.customAccents.length < MAX_ACCENT_COUNT;
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
+  // 取色器实时颜色（仅本地预览，提交时才写入配置）。
+  const [draftHex, setDraftHex] = useState(
+    config.accent === "custom" && config.accentCustom ? config.accentCustom : DEFAULT_ACCENT.primary,
+  );
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const addBtnRef = useRef<HTMLButtonElement>(null);
+
+  /** 点“+”打开取色弹层：先按按钮位置给个初始位，测量后再夹取到视口内。 */
+  function openPicker() {
+    const el = addBtnRef.current;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPickerPos({ top: r.bottom + 8, left: r.left });
+    }
+    setPickerOpen(true);
+  }
+
+  /**
+   * 弹层渲染后测量其真实尺寸，并把位置夹取到视口内，使其始终贴合「+」按钮、
+   * 不超出屏幕：左缘对齐按钮（三角指向按钮），下方放不下则翻到按钮上方，
+   * 右/上/下越界则贴边。
+   */
+  useLayoutEffect(() => {
+    if (!pickerOpen || !pickerRef.current || !addBtnRef.current) return;
+    const pop = pickerRef.current.getBoundingClientRect();
+    const btn = addBtnRef.current.getBoundingClientRect();
+    const margin = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    let left = btn.left; // 左缘对齐按钮，三角指向按钮
+    let top = btn.bottom + 8; // 默认在按钮下方
+
+    // 水平：超右边界左移；仍超左则贴左边界。
+    if (left + pop.width > vw - margin) left = vw - margin - pop.width;
+    if (left < margin) left = margin;
+
+    // 垂直：下方放不下则翻到按钮上方；上方也放不下则贴顶。
+    if (top + pop.height > vh - margin) top = btn.top - pop.height - 8;
+    if (top < margin) top = margin;
+
+    setPickerPos({ top, left });
+  }, [pickerOpen]);
+
+  /** 点击面板内其它区域时关闭取色弹层（点“+”本身除外，由其切换逻辑处理）。 */
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function onDown(e: MouseEvent) {
+      const t = e.target as Node;
+      if (pickerRef.current?.contains(t) || addBtnRef.current?.contains(t)) return;
+      setPickerOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [pickerOpen]);
 
   /** 取色器选定一个 hex：命中已有色则直接选中，否则追加并选中。 */
   function pickCustomHex(raw: string): void {
@@ -257,24 +318,43 @@ export default function SettingsPanel() {
                       );
                     })}
                     <button
+                      ref={addBtnRef}
                       type="button"
                       className="accent-swatch accent-add"
                       title={canAddAccent ? "新增主题色" : `主题色已达上限（${MAX_ACCENT_COUNT}）`}
                       aria-label="新增主题色"
+                      aria-expanded={pickerOpen}
                       disabled={!canAddAccent}
-                      onClick={() => colorInputRef.current?.click()}
+                      onClick={() => (pickerOpen ? setPickerOpen(false) : openPicker())}
                     >
                       <Icon name="Plus" size={13} />
                     </button>
-                    {/* 隐藏取色器：点“+”后弹出系统调色板 */}
-                    <input
-                      ref={colorInputRef}
-                      type="color"
-                      className="hidden"
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      onChange={(e) => pickCustomHex(e.target.value)}
-                    />
+                    {/* react-color 取色弹层：用 Portal 挂到 body，脱离 .popover（含 backdrop-filter/transform，
+                        会成为 fixed 的包含块）的坐标系，避免定位相对 popover 而非视口而溢出。 */}
+                    {pickerOpen && pickerPos &&
+                      createPortal(
+                        <div
+                          ref={pickerRef}
+                          className="accent-picker-popover"
+                          style={{
+                            position: "fixed",
+                            top: pickerPos.top,
+                            left: pickerPos.left,
+                            zIndex: 60,
+                          }}
+                        >
+                          <BlockPicker
+                            color={draftHex}
+                            colors={[...ACCENT_PRESETS.map((p) => p.primary)]}
+                            onChange={(c) => setDraftHex(c.hex)}
+                            onChangeComplete={(c) => {
+                              pickCustomHex(c.hex);
+                              setPickerOpen(false);
+                            }}
+                          />
+                        </div>,
+                        document.body,
+                      )}
                   </div>
                 </div>
 

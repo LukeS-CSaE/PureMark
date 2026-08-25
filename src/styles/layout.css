@@ -565,6 +565,13 @@ button {
   transform: none;
 }
 
+/* react-color 取色弹层容器：浮在设置面板之上，圆角 + 阴影。 */
+.accent-picker-popover {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
 /* Icon button primitive */
 .btn-icon {
   display: inline-flex;

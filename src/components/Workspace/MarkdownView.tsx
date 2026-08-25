@@ -39,6 +39,7 @@ import { buildMarkdownSerializer, serializeNodeToMarkdown } from "../../lib/pros
 import { serializeSourcePreserving } from "../../lib/prosemirror/sourcePreserving";
 import { buildBlockMenu } from "../../lib/prosemirror/blockContextMenu";
 import { handleImagePaste } from "../../lib/pasteImage";
+import { dirOf } from "../../lib/pathUtils";
 import { useUIStore } from "../../store/useUIStore";
 import type { PaneId } from "../../types";
 import "../../styles/pm.css";
@@ -73,6 +74,9 @@ function serializeCurrent(
 
 export default function MarkdownView({ paneId, tabId, editable }: Props) {
   const content = useTabsStore((s) => s.tabs.find((t) => t.id === tabId)?.content ?? "");
+  // 文档所在目录：把相对图片路径解析为 asset URL 的基准；未保存文档为空。
+  const tabPath = useTabsStore((s) => s.tabs.find((t) => t.id === tabId)?.path ?? "");
+  const documentDir = tabPath ? dirOf(tabPath) : "";
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 字节保真基准：本编辑器实例最初加载的 markdown 与其解析后的 PM 文档。
@@ -122,7 +126,8 @@ export default function MarkdownView({ paneId, tabId, editable }: Props) {
 
   const editor = useEditor(
     {
-      extensions: buildEditorExtensions(),
+      // documentDir 随当前文档目录注入，渲染时把相对图片路径转成 asset URL。
+      extensions: buildEditorExtensions(documentDir),
       content: content || "",
       editable,
       // 只读/SSR 渲染：显式 false 让 tipTap 在挂载后（useEffect）再实例化编辑器，
@@ -168,7 +173,9 @@ export default function MarkdownView({ paneId, tabId, editable }: Props) {
         useTabsStore.getState().updateContent(tabId, md);
       },
     },
-    [tabId, editable],
+    // documentDir 进 deps：保存后文档从未保存→已保存（路径由空变有值）时重建
+    // 编辑器，使新 documentDir 注入到 Image 扩展，本地图片才能解析为 asset URL。
+    [tabId, editable, documentDir],
   );
 
   // serializer 在 schema 就绪后构建一次；同时冻结最初解析出的 PM 文档作为保真基准。

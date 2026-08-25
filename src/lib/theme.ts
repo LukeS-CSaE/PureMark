@@ -92,7 +92,7 @@ export interface AccentPreset {
 export const ACCENT_PRESETS: readonly AccentPreset[] = [
   { id: "azure", label: "蓝", primary: "#0071e3", hover: "#0066cc" },
   { id: "sky", label: "青", primary: "#0ea5e9", hover: "#0284c7" },
-  { id: "blue", label: "靛", primary: "#3b82f6", hover: "#2563eb" },
+  // { id: "blue", label: "靛", primary: "#3b82f6", hover: "#2563eb" },
   { id: "green", label: "绿", primary: "#10b981", hover: "#059669" },
   { id: "purple", label: "紫", primary: "#8b5cf6", hover: "#7c3aed" },
   { id: "orange", label: "橙", primary: "#f97316", hover: "#ea580c" },
