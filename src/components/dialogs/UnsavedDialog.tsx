@@ -88,7 +88,7 @@ export default function UnsavedDialog() {
           </button>
           {unsaved.conflict && (
             <button type="button" className="unsaved-btn" onClick={() => settle("viewConflict")}>
-              查看冲突
+              查看差异
             </button>
           )}
           <button

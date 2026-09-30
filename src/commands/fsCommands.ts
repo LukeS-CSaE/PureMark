@@ -8,6 +8,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile, stat } from "@tauri-apps/plugin-fs";
 import { invoke } from "@tauri-apps/api/core";
 import type { FileNode, FileMeta } from "../types";
+import { joinPath } from "../lib/pathUtils";
 
 const MARKDOWN_FILTER = [{ name: "Markdown", extensions: ["md", "markdown"] }];
 
@@ -23,8 +24,21 @@ export async function openFileDialog(): Promise<string | null> {
   return typeof result === "string" ? result : null;
 }
 
-/** Save-as picker for untitled documents. Returns the path or null. */
-export async function saveFileDialog(defaultPath?: string): Promise<string | null> {
+/**
+ * Save-as picker for untitled documents. Returns the path or null.
+ *
+ * `defaultDir`（如侧栏当前文件目录）传入时，对话框默认打开该文件夹，
+ * 文件名预填 `defaultName`；未传入时仅预填文件名，目录由 OS 决定。
+ */
+export async function saveFileDialog(
+  defaultName?: string,
+  defaultDir?: string,
+): Promise<string | null> {
+  const defaultPath = defaultDir
+    ? defaultName
+      ? joinPath(defaultDir, defaultName)
+      : defaultDir
+    : defaultName;
   const result = await save({ defaultPath, filters: MARKDOWN_FILTER });
   return typeof result === "string" ? result : null;
 }
@@ -82,6 +96,11 @@ export async function writeFileTextWithEncoding(
 /** Write a UTF-8 text file. */
 export async function writeFileText(path: string, content: string): Promise<void> {
   await writeTextFile(path, content);
+}
+
+/** 写入二进制文件（剪贴板图片保存），自动创建父目录。 */
+export async function writeBinaryFile(path: string, data: Uint8Array): Promise<void> {
+  await invoke("write_binary_file", { path, data: Array.from(data) });
 }
 
 /**

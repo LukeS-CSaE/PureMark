@@ -16,6 +16,8 @@ import {
 import { storeGet, storeSet } from "../lib/tauri";
 import { captureDiskState } from "../lib/conflictGuard";
 import { requestCloseTab } from "../lib/closeGuard";
+import { useUIStore } from "./useUIStore";
+import { useConfigStore } from "./useConfigStore";
 
 interface OpenTabInput {
   path: string;
@@ -182,7 +184,12 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
     let path = tab.path;
     if (!path) {
-      const chosen = await saveFileDialog(tab.name);
+      // 保存对话框默认打开与侧栏文件目录相同的文件夹（其次 lastFolder）。
+      const dir =
+        useUIStore.getState().currentFolder ??
+        useConfigStore.getState().config.lastFolder ??
+        undefined;
+      const chosen = await saveFileDialog(tab.name, dir);
       if (!chosen) return; // user cancelled — keep the tab dirty
       path = chosen;
     }

@@ -122,3 +122,16 @@ export function parseToc(md: string): TocItem[] {
 
   return items;
 }
+
+/**
+ * 源码行号 → 文档内标题序号(ordinal)。
+ *
+ * TOC 条目携带的是 markdown 源码 1-based 行号,而 ProseMirror 文档是块结构
+ * (无行号概念);两者通过 parseToc 的标题序列对齐:取该 line 在标题序列中的
+ * 位置作为 ordinal,再按文档内标题节点的出现顺序取第 ordinal 个。
+ * 找不到对应行(内容刚变化、TOC 尚未刷新)返回 null,调用方安全放弃跳转。
+ */
+export function resolveHeadingOrdinal(md: string, line: number): number | null {
+  const idx = parseToc(md).findIndex((item) => item.line === line);
+  return idx < 0 ? null : idx;
+}

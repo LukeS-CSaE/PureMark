@@ -38,6 +38,7 @@ import {
   isGeometryReady,
   isValidGeometry,
   markGeometryReady,
+  minWindowWidth,
   parsePersistedGeometry,
   resetGeometryGate,
   shouldPersist,
@@ -168,12 +169,18 @@ describe("parsePersistedGeometry — clamping against a work area", () => {
     });
   });
 
-  it("raises a record smaller than WINDOW_MIN", () => {
+  it("raises a record smaller than the dynamic minimum", () => {
     const parsed = parsePersistedGeometry(record(400, 300), BIG);
     expect(parsed).toMatchObject({
-      width: WINDOW_MIN.width,
+      width: minWindowWidth(BIG.width),
       height: WINDOW_MIN.height,
     });
+  });
+
+  it("keeps a record that sits between the dynamic minimum and the old 960", () => {
+    // 700 < 960 (old fixed minimum) but 700 > 640 (1920 / 3) — it is legal now.
+    const parsed = parsePersistedGeometry(record(700, 700), BIG);
+    expect(parsed).toMatchObject({ width: 700, height: 700 });
   });
 
   it("small-screen fallback: goes BELOW WINDOW_MIN rather than overflow", () => {
@@ -214,6 +221,25 @@ describe("clampAxis", () => {
   it("rounds to whole logical pixels and never returns a non-positive size", () => {
     expect(clampAxis(1200.6, 960, 1920)).toBe(1201);
     expect(clampAxis(1200, 960, 10)).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// minWindowWidth — the dynamic minimum (one third of the screen width)
+// ---------------------------------------------------------------------------
+
+describe("minWindowWidth", () => {
+  it("is one third of the screen width, rounded to whole logical pixels", () => {
+    expect(minWindowWidth(1920)).toBe(640);
+    expect(minWindowWidth(2560)).toBe(853);
+    expect(minWindowWidth(1000)).toBe(333);
+  });
+
+  it("never returns a non-positive constraint", () => {
+    expect(minWindowWidth(1)).toBe(1);
+    expect(minWindowWidth(0)).toBe(1);
+    expect(minWindowWidth(-500)).toBe(1);
+    expect(minWindowWidth(Number.NaN)).toBe(1);
   });
 });
 
@@ -284,13 +310,23 @@ describe("computeStartupGeometry — decision table", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it("row 5 — a too-small record is raised to WINDOW_MIN", () => {
+  it("row 5 — a too-small record is raised to the dynamic minimum", () => {
     const plan = computeStartupGeometry(record(500, 300), BIG);
     expect(plan).toEqual({
-      width: WINDOW_MIN.width,
+      width: minWindowWidth(BIG.width),
       height: WINDOW_MIN.height,
       maximize: false,
       source: "raised",
+    });
+  });
+
+  it("row 5/6 — below the old fixed 960 but above 1/3 screen is honoured", () => {
+    const plan = computeStartupGeometry(record(700, 700), BIG);
+    expect(plan).toEqual({
+      width: 700,
+      height: 700,
+      maximize: false,
+      source: "remembered",
     });
   });
 
@@ -481,6 +517,7 @@ describe("shouldPersistOnClose — clamp write protection", () => {
 // ---------------------------------------------------------------------------
 
 const setSize = vi.fn(async () => {});
+const setMinSize = vi.fn(async () => {});
 const center = vi.fn(async () => {});
 const maximize = vi.fn(async () => {});
 const isMaximized = vi.fn(async () => false);
@@ -503,6 +540,7 @@ const storeSetMock = vi.fn(async (_key: string, _value: unknown) => {});
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     setSize,
+    setMinSize,
     center,
     maximize,
     isMaximized,
@@ -554,6 +592,18 @@ describe("applyStartupGeometry — atomic apply", () => {
     expect(setSize).toHaveBeenCalledOnce();
     expect(center).toHaveBeenCalledOnce();
     expect(maximize).not.toHaveBeenCalled();
+  });
+
+  it("sets the OS minimum width to one third of the screen width", async () => {
+    // 2880px physical @1.5 -> 1920 logical -> min width 640; height keeps the
+    // fixed WINDOW_MIN.height floor.
+    await applyStartupGeometry();
+    expect(setMinSize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        width: minWindowWidth(2880 / 1.5),
+        height: WINDOW_MIN.height,
+      }),
+    );
   });
 
   it("sizes in LOGICAL pixels derived from the logical work area (RC-1)", async () => {

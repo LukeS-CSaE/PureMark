@@ -6,8 +6,8 @@
   z-index: 90;
   min-width: 200px;
   padding: 6px;
-  background: var(--popover);
-  color: var(--popover-foreground);
+  background: var(--surface);
+  /* color: var(--popover-foreground); */
   border: 1px solid var(--hairline);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-3);

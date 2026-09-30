@@ -47,6 +47,11 @@
   --muted: #f1f2f4;
   --muted-foreground: #6e6e73;
 
+  /* Warning (rename extension-change notice) */
+  --warning: #b45309;
+  --warning-bg: #fff7e6;
+  --warning-border: rgba(245, 158, 11, 0.5);
+
   /* Radius scale — keep sm/md/lg, add Apple tiers */
   --radius-sm: 4px;
   --radius-md: 8px;
@@ -181,4 +186,24 @@
   --acrylic: rgba(20, 25, 33, 0.6);
   --acrylic-strong: rgba(20, 25, 33, 0.8);
   --acrylic-border-top: rgba(255, 255, 255, 0.08);
+
+  /* Code highlighting palette — GitHub Dark（与浅色 §1.6 同源，
+   * highlight.css / live.css 消费同一组令牌，暗色下自动换色） */
+  --hl-comment: #8b949e;
+  --hl-keyword: #ff7b72;
+  --hl-string: #a5d6ff;
+  --hl-number: #79c0ff;
+  --hl-title: #d2a8ff;
+  --hl-type: #ffa657;
+  --hl-variable: #ffa657;
+  --hl-literal: #79c0ff;
+  --hl-meta: #8b949e;
+  --hl-symbol: #79c0ff;
+  --hl-addition: #7ee787;
+  --hl-deletion: #ffa198;
+
+  /* Warning (rename extension-change notice) */
+  --warning: #fbbf24;
+  --warning-bg: rgba(245, 158, 11, 0.12);
+  --warning-border: rgba(245, 158, 11, 0.4);
 }

@@ -9,6 +9,7 @@
 import { create } from "zustand";
 import type {
   FileNode,
+  RenameState,
   ResolvedTheme,
   SidebarMode,
   UnsavedDialogState,
@@ -32,6 +33,8 @@ interface UIState {
   tree: FileNode[];
   searchOpen: boolean;
   configOpen: boolean;
+  /** 底部系统终端抽屉是否展开（会话级 UI 状态，不持久化）。 */
+  terminalOpen: boolean;
 
   /** 自定义确认弹窗状态（未保存/刷新/冲突），驱动 UnsavedDialog（需求1）。 */
   unsaved: UnsavedDialogState | null;
@@ -42,10 +45,17 @@ interface UIState {
 
   /** 自定义右键菜单状态（需求2）：非空时渲染 <ContextMenu/>。 */
   contextMenu: ContextMenuState | null;
+  /** 重命名弹层状态：非空时渲染 <RenamePopover/>。 */
+  rename: RenameState | null;
   /** 打开自定义菜单（编辑器 / 文件树 / 标签页）。 */
   openContextMenu(state: ContextMenuState): void;
   /** 关闭自定义菜单。 */
   closeContextMenu(): void;
+
+  /** 打开重命名弹层。 */
+  openRename(state: RenameState): void;
+  /** 关闭重命名弹层。 */
+  closeRename(): void;
 
   setResolvedTheme(t: ResolvedTheme): void;
   toggleSidebar(): void;
@@ -55,6 +65,8 @@ interface UIState {
   setFolder(path: string, tree: FileNode[]): void;
   setSearchOpen(b: boolean): void;
   setConfigOpen(b: boolean): void;
+  setTerminalOpen(b: boolean): void;
+  toggleTerminal(): void;
 
   openUnsaved(state: UnsavedDialogState): void;
   closeUnsaved(): void;
@@ -73,11 +85,13 @@ export const useUIStore = create<UIState>((set) => ({
   tree: [],
   searchOpen: false,
   configOpen: false,
+  terminalOpen: false,
 
   unsaved: null,
   conflictView: null,
   externalChange: null,
   contextMenu: null,
+  rename: null,
 
   setResolvedTheme: (t) => set((s) => (s.resolvedTheme === t ? s : { resolvedTheme: t })),
   toggleSidebar: () => set((s) => ({ sidebarVisible: !s.sidebarVisible })),
@@ -87,6 +101,8 @@ export const useUIStore = create<UIState>((set) => ({
   setFolder: (path, tree) => set({ currentFolder: path, tree }),
   setSearchOpen: (b) => set({ searchOpen: b }),
   setConfigOpen: (b) => set({ configOpen: b }),
+  setTerminalOpen: (b) => set({ terminalOpen: b }),
+  toggleTerminal: () => set((s) => ({ terminalOpen: !s.terminalOpen })),
 
   openUnsaved: (state) => set({ unsaved: state }),
   closeUnsaved: () => set({ unsaved: null }),
@@ -97,4 +113,7 @@ export const useUIStore = create<UIState>((set) => ({
 
   openContextMenu: (state) => set({ contextMenu: state }),
   closeContextMenu: () => set({ contextMenu: null }),
+
+  openRename: (state) => set({ rename: state }),
+  closeRename: () => set({ rename: null }),
 }));

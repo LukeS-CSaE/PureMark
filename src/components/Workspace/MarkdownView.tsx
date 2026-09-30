@@ -19,12 +19,17 @@ import { useEffect, useRef, useCallback } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import type { Editor } from "@tiptap/core";
 import type { Node as PMNode } from "@tiptap/pm/model";
+import { TextSelection } from "@tiptap/pm/state";
 import { buildEditorExtensions } from "../../lib/prosemirror/editorExtensions";
 import type { MarkdownSerializer } from "prosemirror-markdown";
 import { useTabsStore } from "../../store/useTabsStore";
 import { usePanesStore } from "../../store/usePanesStore";
 import { registerScrollPane } from "../../lib/scrollSync";
-import { parseToc } from "../../lib/toc";
+import { rememberScrollPosition, recallScrollPosition } from "../../lib/scrollMemory";
+import { parseToc, resolveHeadingOrdinal } from "../../lib/toc";
+import { registerToc, unregisterToc } from "../../lib/tocRegistry";
+import { registerBlockOps, unregisterBlockOps } from "../../lib/blockOpsRegistry";
+import { duplicateBlockDown, moveBlock } from "../../lib/prosemirror/blockHotkeys";
 import { attachHeadingAnchors } from "../../lib/headingAnchors";
 import { focusPane } from "../../lib/paneRouter";
 import { registerEditor, unregisterEditor, type EditorHandle } from "../../lib/editorRegistry";
@@ -32,6 +37,10 @@ import { scrollToMatchOrdinal } from "../../lib/searchScroll";
 import { searchHighlightKey } from "../../lib/prosemirror/searchHighlight";
 import { buildMarkdownSerializer, serializeNodeToMarkdown } from "../../lib/prosemirror/markdownSerializer";
 import { serializeSourcePreserving } from "../../lib/prosemirror/sourcePreserving";
+import { buildBlockMenu } from "../../lib/prosemirror/blockContextMenu";
+import { handleImagePaste } from "../../lib/pasteImage";
+import { dirOf } from "../../lib/pathUtils";
+import { useUIStore } from "../../store/useUIStore";
 import type { PaneId } from "../../types";
 import "../../styles/pm.css";
 
@@ -65,6 +74,9 @@ function serializeCurrent(
 
 export default function MarkdownView({ paneId, tabId, editable }: Props) {
   const content = useTabsStore((s) => s.tabs.find((t) => t.id === tabId)?.content ?? "");
+  // 文档所在目录：把相对图片路径解析为 asset URL 的基准；未保存文档为空。
+  const tabPath = useTabsStore((s) => s.tabs.find((t) => t.id === tabId)?.path ?? "");
+  const documentDir = tabPath ? dirOf(tabPath) : "";
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 字节保真基准：本编辑器实例最初加载的 markdown 与其解析后的 PM 文档。
@@ -75,8 +87,24 @@ export default function MarkdownView({ paneId, tabId, editable }: Props) {
   const currentTabRef = useRef<string | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 滚动进度记忆（与 CodeEditor 设计 §8.2 同源）：切走时快照、切回时恢复，
+  // 避免 TipTap 重建后 scrollTop 被清零、切回文档只能从头再滚。
+  const scrollByTabRef = useRef(new Map<string, number>());
+  /** 待恢复滚动位置的 tabId（tab / 视图切换时置位，内容回填 effect 消费）。 */
+  const pendingScrollRestoreRef = useRef<string | null>(null);
+  const lastEditableRef = useRef(editable);
+
   // tab 切换时重置保真基准（与旧 live 视图同源）。
   if (tabId && currentTabRef.current !== tabId) {
+    // 先快照上一个文档的滚动进度，再换 tab。
+    if (currentTabRef.current && scrollRef.current) {
+      rememberScrollPosition(
+        scrollByTabRef.current,
+        currentTabRef.current,
+        scrollRef.current.scrollTop,
+      );
+    }
+    pendingScrollRestoreRef.current = tabId;
     currentTabRef.current = tabId;
     const tab = useTabsStore.getState().tabs.find((t) => t.id === tabId);
     originalRef.current = tab ? tab.content : "";
@@ -85,15 +113,59 @@ export default function MarkdownView({ paneId, tabId, editable }: Props) {
     lastWrittenRef.current = null;
   }
 
+  // 同一文档的 live↔preview 切换同样会重建编辑器、清空滚动，一并快照/恢复。
+  if (lastEditableRef.current !== editable) {
+    lastEditableRef.current = editable;
+    if (tabId) {
+      if (scrollRef.current) {
+        rememberScrollPosition(scrollByTabRef.current, tabId, scrollRef.current.scrollTop);
+      }
+      pendingScrollRestoreRef.current = tabId;
+    }
+  }
+
   const editor = useEditor(
     {
-      extensions: buildEditorExtensions(),
+      // documentDir 随当前文档目录注入，渲染时把相对图片路径转成 asset URL。
+      extensions: buildEditorExtensions(documentDir),
       content: content || "",
       editable,
       // 只读/SSR 渲染：显式 false 让 tipTap 在挂载后（useEffect）再实例化编辑器，
       // 规避开发期 "SSR detected" 告警并防止 hydration 不匹配。
       immediatelyRender: false,
-      editorProps: { attributes: { class: "pm-editor" } },
+      editorProps: {
+        attributes: { class: "pm-editor" },
+        // 图片粘贴拦截：检测到剪贴板含图片时保存为本地文件并插入 markdown 图片语法。
+        // 未保存文档（tab.path 为空）不拦截，回退为浏览器默认粘贴行为。
+        handlePaste: (view, event) => {
+          if (!editable || !tabId) return false;
+          const tab = useTabsStore.getState().tabs.find((t) => t.id === tabId);
+          if (!tab?.path) return false;
+          const clipData = event.clipboardData;
+          if (!clipData) return false;
+          // 同步检测是否含图片，无图片则不拦截（返回 false 让 TipTap 默认处理文本粘贴）。
+          let hasImg = false;
+          for (let i = 0; i < clipData.items.length; i++) {
+            if (clipData.items[i].kind === "file" && clipData.items[i].type.startsWith("image/")) {
+              hasImg = true;
+              break;
+            }
+          }
+          if (!hasImg) return false;
+          // 有图片：阻止默认粘贴，异步保存后插入。
+          // 注意：不能用 editor 闭包（useEditor 首渲染时为 null），直接用 view 参数。
+          event.preventDefault();
+          handleImagePaste(clipData, tab.path)
+            .then((relPath) => {
+              if (!relPath) return;
+              const imageNode = view.state.schema.nodes.image?.create({ src: relPath });
+              if (!imageNode) return;
+              view.dispatch(view.state.tr.replaceSelectionWith(imageNode));
+            })
+            .catch((err) => console.error("[paste-image] 保存失败：", err));
+          return true;
+        },
+      },
       onUpdate: ({ editor }) => {
         if (!editable || !tabId) return;
         const md = serializeCurrent(editor, originalDocRef.current, originalRef.current, serializerRef.current);
@@ -101,7 +173,9 @@ export default function MarkdownView({ paneId, tabId, editable }: Props) {
         useTabsStore.getState().updateContent(tabId, md);
       },
     },
-    [tabId, editable],
+    // documentDir 进 deps：保存后文档从未保存→已保存（路径由空变有值）时重建
+    // 编辑器，使新 documentDir 注入到 Image 扩展，本地图片才能解析为 asset URL。
+    [tabId, editable, documentDir],
   );
 
   // serializer 在 schema 就绪后构建一次；同时冻结最初解析出的 PM 文档作为保真基准。
@@ -118,16 +192,28 @@ export default function MarkdownView({ paneId, tabId, editable }: Props) {
   // editable 时外部变更同样整体 setContent）。与 live 视图的回填逻辑同源。
   useEffect(() => {
     if (!editor || !editor.view) return;
-    if (content === lastWrittenRef.current) return;
-    lastWrittenRef.current = content;
-    try {
-      editor.commands.setContent(content || "", false);
-      // 只读视图挂载 TOC 标题锚点（可编辑视图因 PM 会重排 DOM 暂不挂载，沿用原 live 行为）。
-      if (!editable) {
-        attachHeadingAnchors(editor.view.dom as HTMLElement, parseToc(content));
+    if (content !== lastWrittenRef.current) {
+      lastWrittenRef.current = content;
+      try {
+        editor.commands.setContent(content || "", false);
+      } catch (err) {
+        console.error("[markdown-view] 回填内容失败（已吞掉，避免白屏）：", err);
       }
-    } catch (err) {
-      console.error("[markdown-view] 回填内容失败（已吞掉，避免白屏）：", err);
+    }
+    // 内容就位后恢复切走前的滚动进度（仅 tab / 视图切换后的首次回填，
+    // 后续外部变更不会误把用户当前滚动位置拽回去）。
+    if (tabId && pendingScrollRestoreRef.current === tabId) {
+      pendingScrollRestoreRef.current = null;
+      const restored = recallScrollPosition(scrollByTabRef.current, tabId);
+      if (scrollRef.current) scrollRef.current.scrollTop = restored;
+      usePanesStore.getState().setPaneScroll(paneId, restored);
+    }
+    // 只读视图挂载 TOC 标题锚点（可编辑视图因 PM 会重排 DOM 暂不挂载，沿用原 live 行为）。
+    // 注意：必须独立于上面的内容变更 guard——live→preview 切换时编辑器重建，
+    // 但 lastWrittenRef 仍等于 store 内容（live 的 onUpdate 写过），guard 会跳过
+    // 本 effect 的剩余部分，导致新预览编辑器的标题没有 id、TOC 点击无法跳转。
+    if (!editable) {
+      attachHeadingAnchors(editor.view.dom as HTMLElement, parseToc(content));
     }
   }, [content, editor, editable]);
 
@@ -224,6 +310,73 @@ export default function MarkdownView({ paneId, tabId, editable }: Props) {
     return () => unregisterEditor(paneId);
   }, [editor, paneId, tabId, editable, clearHighlight]);
 
+  // ── TOC 跳转:注册 TocAdapter,由 tocRouter.jumpToHeading 驱动 ──
+  // 此前整个代码库无人注册 adapter,导致「点击目录标题编辑区不跳转」。
+  // preview 走 tocRouter 的 DOM 锚点路径,不需要 adapter;
+  // live(及 CM 关闭时的 edit)在此注册。
+  useEffect(() => {
+    if (!editor || editable === false) return;
+    registerToc(paneId, {
+      getMarkdown: () =>
+        serializeCurrent(editor, originalDocRef.current, originalRef.current, serializerRef.current),
+      scrollToHeading(line) {
+        const view = editor.view;
+        if (!view) return;
+        const md = serializeCurrent(editor, originalDocRef.current, originalRef.current, serializerRef.current);
+        const ordinal = resolveHeadingOrdinal(md, line);
+        if (ordinal === null) return;
+        // 按文档顺序取第 ordinal 个标题节点(与 parseToc 的标题序对齐)。
+        let seen = 0;
+        let targetPos = -1;
+        view.state.doc.descendants((node, pos) => {
+          if (targetPos >= 0) return false;
+          if (node.type.name === "heading") {
+            if (seen === ordinal) targetPos = pos;
+            seen += 1;
+          }
+          return true;
+        });
+        if (targetPos < 0) return;
+        try {
+          // nodeDOM 直接返回标题节点对应的 DOM（domAtPos 在块前位置会返回
+          // 父容器+offset，滚动目标会错成整个编辑区）。
+          const dom = view.nodeDOM(targetPos);
+          const el =
+            dom instanceof HTMLElement ? dom : dom?.parentElement ?? null;
+          if (!el) return;
+          el.scrollIntoView({ block: "start" });
+          // 光标同步移到标题处（与 CM 源码视图的跳转行为一致）。
+          view.dispatch(
+            view.state.tr.setSelection(
+              TextSelection.near(view.state.doc.resolve(targetPos)),
+            ),
+          );
+        } catch {
+          // 边界失败则放弃跳转。
+        }
+      },
+    });
+    return () => unregisterToc(paneId);
+  }, [editor, paneId, editable]);
+
+  // ── 块快捷键：注册到 blockOpsRegistry，由 App 窗口级热键驱动 ──
+  // Ctrl+D 复制块 / Alt+↑·↓ 移动块。先 focus 再执行，
+  // 保证焦点在窗口内任意位置时操作都作用于当前 pane 的编辑器。
+  useEffect(() => {
+    if (!editor || editable === false) return;
+    registerBlockOps(paneId, {
+      duplicate: () => {
+        editor.view?.focus();
+        return duplicateBlockDown(editor);
+      },
+      move: (dir) => {
+        editor.view?.focus();
+        return moveBlock(editor, dir);
+      },
+    });
+    return () => unregisterBlockOps(paneId);
+  }, [editor, paneId, editable]);
+
   return (
     <div
       ref={scrollRef}
@@ -232,6 +385,28 @@ export default function MarkdownView({ paneId, tabId, editable }: Props) {
       data-view={editable ? "live" : "preview"}
       onMouseDownCapture={() => focusPane(paneId)}
       onFocusCapture={() => focusPane(paneId)}
+      onContextMenu={(e: import("react").MouseEvent) => {
+        // 文字块右键快捷菜单（仅可编辑视图）：上/下插入段落、删块、
+        // 表格内追加行操作。全局 guard 已在 capture 阶段压制原生菜单，
+        // 这里在冒泡阶段打开自定义菜单（与 CodeEditor 同源接线）。
+        if (!editable || !editor?.view) return;
+        e.preventDefault();
+        focusPane(paneId);
+        // 先把光标移到右键点击处，保证菜单动作作用于点击处的块。
+        const pos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
+        if (pos != null) {
+          editor.view.dispatch(
+            editor.state.tr.setSelection(TextSelection.near(editor.state.doc.resolve(pos.pos))),
+          );
+        }
+        useUIStore.getState().openContextMenu({
+          x: e.clientX,
+          y: e.clientY,
+          scope: "editor",
+          items: buildBlockMenu(editor),
+          payload: { tabId: tabId ?? undefined },
+        });
+      }}
     >
       <EditorContent editor={editor} />
     </div>

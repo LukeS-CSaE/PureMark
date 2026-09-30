@@ -20,8 +20,10 @@ import type { WindowGeometry } from "../types";
 import {
   WINDOW_DEFAULT,
   WINDOW_MARGIN,
+  WINDOW_MIN,
   computeStartupGeometry,
   markGeometryReady,
+  minWindowWidth,
   parsePersistedGeometry,
   resetGeometryGate,
   shouldPersist,
@@ -108,20 +110,28 @@ export async function focusWindow(): Promise<void> {
 
 const WINDOW_STATE_KEY = "window-state";
 
-/** Read the current monitor's work area, converted to logical pixels. */
-async function readLogicalWorkArea(): Promise<WorkArea> {
+/**
+ * Read the current monitor in logical pixels: the work area (for clamping) and
+ * the full screen size (the "screen width" the dynamic minimum is derived
+ * from — `minWindowWidth`, one third of it).
+ */
+async function readLogicalScreen(): Promise<{ work: WorkArea; screen: WorkArea }> {
   const mon = (await currentMonitor()) ?? (await primaryMonitor());
   if (!mon) {
     // No monitor info (headless / API unavailable): pretend the screen is just
     // big enough for the default size so `computeStartupGeometry` returns it.
-    return {
+    const fallback = {
       width: WINDOW_DEFAULT.width + WINDOW_MARGIN,
       height: WINDOW_DEFAULT.height + WINDOW_MARGIN,
     };
+    return { work: fallback, screen: fallback };
   }
   const sf = mon.scaleFactor || 1;
   const area = mon.workArea?.size ?? mon.size;
-  return { width: area.width / sf, height: area.height / sf };
+  return {
+    work: { width: area.width / sf, height: area.height / sf },
+    screen: { width: mon.size.width / sf, height: mon.size.height / sf },
+  };
 }
 
 /** Read the live window size in logical pixels. */
@@ -156,8 +166,15 @@ export async function applyStartupGeometry(): Promise<void> {
   try {
     const win = getCurrentWindow();
     const remembered = await storeGet<unknown>(WINDOW_STATE_KEY);
-    const work = await readLogicalWorkArea();
+    const { work, screen } = await readLogicalScreen();
     const plan = computeStartupGeometry(remembered, work);
+
+    // 动态最小宽度:屏幕宽度的三分之一(高度沿用固定下限)。
+    // tauri.conf.json 的 minWidth 只在 JS 接管前的瞬间生效,这里才是
+    // 整个会话真正的 OS 级约束。
+    await win.setMinSize(
+      new LogicalSize(minWindowWidth(screen.width), WINDOW_MIN.height),
+    );
 
     // The one and only setSize of the whole session.
     await win.setSize(new LogicalSize(plan.width, plan.height));

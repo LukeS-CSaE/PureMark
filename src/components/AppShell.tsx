@@ -7,7 +7,9 @@ import SettingsPanel from "./dialogs/SettingsPanel";
 import UnsavedDialog from "./dialogs/UnsavedDialog";
 import ConflictResolvePage from "./dialogs/ConflictResolvePage";
 import ExternalChangeBar from "./dialogs/ExternalChangeBar";
+import RenamePopover from "./dialogs/RenamePopover";
 import ContextMenu from "./ContextMenu";
+import TerminalPanel from "./Terminal/TerminalPanel";
 import { useUIStore } from "../store/useUIStore";
 import { useConfigStore } from "../store/useConfigStore";
 
@@ -20,6 +22,7 @@ export default function AppShell() {
   const sidebarVisible = useUIStore((s) => s.sidebarVisible);
   const searchOpen = useUIStore((s) => s.searchOpen);
   const configOpen = useUIStore((s) => s.configOpen);
+  const terminalOpen = useUIStore((s) => s.terminalOpen);
   const showScrollbar = useConfigStore((s) => s.config.showScrollbar);
 
   return (
@@ -29,6 +32,7 @@ export default function AppShell() {
         {sidebarVisible && <Sidebar />}
         <Workspace />
       </div>
+      {terminalOpen && <TerminalPanel />}
       <StatusBar />
       {searchOpen && <SearchPanel />}
       {configOpen && <SettingsPanel />}
@@ -37,6 +41,9 @@ export default function AppShell() {
       <ExternalChangeBar />
       <UnsavedDialog />
       <ConflictResolvePage />
+
+      {/* 重命名弹层（替代 window.prompt） */}
+      <RenamePopover />
 
       {/* 需求2：自定义右键菜单（受 useUIStore.contextMenu 驱动，portal 至 body） */}
       <ContextMenu />

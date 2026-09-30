@@ -24,6 +24,9 @@ import { useUIStore } from "../../store/useUIStore";
 import { useDocSync } from "../../hooks/useDocSync";
 import { focusPane } from "../../lib/paneRouter";
 import { registerScrollPane } from "../../lib/scrollSync";
+import { registerToc, unregisterToc } from "../../lib/tocRegistry";
+import { registerBlockOps, unregisterBlockOps } from "../../lib/blockOpsRegistry";
+import { cmDuplicateDown, cmMoveBlock } from "../../lib/cmBlockOps";
 import {
   createEditorState,
   darkCompartment,
@@ -34,6 +37,7 @@ import {
 } from "../../lib/cm/setup";
 import { fontTheme } from "../../lib/cm/cmTheme";
 import { buildEditorMenu } from "../../lib/editorContextMenu";
+import { handleImagePaste, hasImageItem } from "../../lib/pasteImage";
 
 export interface CodeEditorProps {
   paneId: PaneId;
@@ -94,7 +98,31 @@ export default function CodeEditor({ paneId, tabId }: CodeEditorProps) {
       // 统一重构后 CM 仅作源码编辑器，不再承载 live 装饰路径。
       liveExtension: [],
       onUpdate: (update) => updateHandlerRef.current(update),
-      extraExtensions: [],
+      // 图片粘贴拦截：检测到剪贴板含图片时保存为本地文件并插入 markdown 图片语法。
+      // 未保存文档（tab.path 为空）不拦截，回退为浏览器默认粘贴行为。
+      extraExtensions: [
+        EditorView.domEventHandlers({
+          paste(event, view) {
+            // 从 store 读取当前活动 tab（不依赖外部闭包，始终取最新值）。
+            const tabs = useTabsStore.getState().tabs;
+            const pane = usePanesStore.getState().getPane(paneId);
+            const tab = pane?.tabId ? tabs.find((t) => t.id === pane.tabId) : null;
+            if (!tab?.path) return false;
+            const items = event.clipboardData?.items;
+            if (!items || !hasImageItem(items)) return false;
+            event.preventDefault();
+            handleImagePaste(event.clipboardData!, tab.path)
+              .then((relPath) => {
+                if (relPath) {
+                  const text = `![image](${relPath})`;
+                  view.dispatch(view.state.replaceSelection(text));
+                }
+              })
+              .catch((err) => console.error("[paste-image] 保存失败：", err));
+            return true;
+          },
+        }),
+      ],
     });
 
     const instance = new EditorView({ state, parent: host });
@@ -176,6 +204,55 @@ export default function CodeEditor({ paneId, tabId }: CodeEditorProps) {
       getTabId: () => usePanesStore.getState().getPane(paneId)?.tabId ?? null,
     });
     return unregister;
+  }, [view, paneId]);
+
+  // ---- TOC adapter registration (目录点击跳转,edit 视图走 CM 行号语义) ----
+  useEffect(() => {
+    if (!view) return;
+    registerToc(paneId, {
+      getMarkdown: () => view.state.doc.toString(),
+      scrollToHeading(line) {
+        const lineInfo = view.state.doc.line(Math.min(Math.max(line, 1), view.state.doc.lines));
+        view.dispatch({
+          selection: { anchor: lineInfo.from },
+          effects: EditorView.scrollIntoView(lineInfo.from, { y: "start" }),
+        });
+      },
+    });
+    return () => unregisterToc(paneId);
+  }, [view, paneId]);
+
+  // ---- 块快捷键注册（Ctrl+D 复制 / Alt+↑·↓ 移动，窗口级热键驱动）----
+  // 源码视图以「空行分隔的段落」为块单位；操作后视口跟随光标。
+  useEffect(() => {
+    if (!view) return;
+    registerBlockOps(paneId, {
+      duplicate: () => {
+        const pos = view.state.selection.main.head;
+        const change = cmDuplicateDown(view.state, pos);
+        if (!change) return false;
+        view.dispatch({
+          changes: { from: change.from, to: change.to, insert: change.insert },
+          selection: { anchor: change.cursor },
+          effects: EditorView.scrollIntoView(change.cursor, { y: "center" }),
+        });
+        view.focus();
+        return true;
+      },
+      move: (dir) => {
+        const pos = view.state.selection.main.head;
+        const change = cmMoveBlock(view.state, pos, dir);
+        if (!change) return false;
+        view.dispatch({
+          changes: { from: change.from, to: change.to, insert: change.insert },
+          selection: { anchor: change.cursor },
+          effects: EditorView.scrollIntoView(change.cursor, { y: "center" }),
+        });
+        view.focus();
+        return true;
+      },
+    });
+    return () => unregisterBlockOps(paneId);
   }, [view, paneId]);
 
   return (

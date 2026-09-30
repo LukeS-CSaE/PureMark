@@ -1,5 +1,7 @@
 import { useTabsStore } from "../../store/useTabsStore";
+import { useUIStore } from "../../store/useUIStore";
 import { useEditorStats } from "../../hooks/useEditorStats";
+import Icon from "../ui/Icon";
 
 /** 编码标签 → 状态栏显示名（gb18030 兼容 GBK/GB2312，统一显示为 GBK）。 */
 function encodingLabel(encoding: string | undefined, hadBom: boolean | undefined): string {
@@ -23,6 +25,8 @@ export default function StatusBar() {
     active?.content ?? "",
     active?.cursor ?? { line: 1, col: 1 },
   );
+  const terminalOpen = useUIStore((s) => s.terminalOpen);
+  const toggleTerminal = useUIStore((s) => s.toggleTerminal);
 
   return (
     <footer className="app-statusbar">
@@ -32,10 +36,19 @@ export default function StatusBar() {
         <span>{stats.chars} charts</span>
       </div>
 
-      {/* 右侧：当前文档的编码（非 UTF-8 中文文档自动检测得出）+ 类型。 */}
       <div className="status-item">
+        {/* 右侧：当前文档的编码（非 UTF-8 中文文档自动检测得出）+ 类型。 */}
         <span>{encodingLabel(active?.encoding, active?.hadBom)}</span>
         <span>Markdown</span>
+        <button
+          className={`status-terminal-btn${terminalOpen ? " active" : ""}`}
+          onClick={toggleTerminal}
+          title="系统终端（Ctrl+`）"
+          aria-label="切换系统终端"
+        >
+          <Icon name="Terminal" size={13} />
+          <span>终端</span>
+        </button>
       </div>
     </footer>
   );

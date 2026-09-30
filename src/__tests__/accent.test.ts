@@ -284,8 +284,9 @@ describe("deriveAccentVars — illegal input falls back to sky", () => {
  * ------------------------------------------------------------------ */
 
 describe("ACCENT_PRESETS", () => {
-  it("ships exactly the seven documented presets in order (design §3.2)", () => {
+  it("ships the documented presets in order (design §3.2 + azure)", () => {
     expect(ACCENT_PRESETS.map((p) => p.id)).toEqual([
+      "azure",
       "sky",
       "blue",
       "green",
@@ -298,6 +299,7 @@ describe("ACCENT_PRESETS", () => {
 
   it("matches the documented hex snapshot", () => {
     expect(ACCENT_PRESETS.map((p) => [p.id, p.primary, p.hover])).toEqual([
+      ["azure", "#0071e3", "#0066cc"],
       ["sky", "#0ea5e9", "#0284c7"],
       ["blue", "#3b82f6", "#2563eb"],
       ["green", "#10b981", "#059669"],

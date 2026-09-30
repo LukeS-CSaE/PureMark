@@ -10,6 +10,7 @@ import { useTheme } from "./hooks/useTheme";
 import { shouldSuppressContextMenu } from "./lib/contextMenuGuard";
 import { openInFocusedPane, newUntitledInFocusedPane } from "./lib/paneRouter";
 import { requestCloseTab } from "./lib/closeGuard";
+import { getBlockOps } from "./lib/blockOpsRegistry";
 import { guardRefresh } from "./lib/refreshGuard";
 import { initFileWatchers } from "./lib/fileWatcher";
 import {
@@ -21,39 +22,60 @@ import {
 } from "./lib/tauri";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { readFileTextWithEncoding, buildTree } from "./commands/fsCommands";
+import { readFileTextWithEncoding } from "./commands/fsCommands";
+import { switchFolderRoot } from "./lib/fileOps";
 import { dirOf } from "./lib/pathUtils";
+import { onTerminalData, onTerminalExit } from "./lib/terminal";
+import { useTerminalStore } from "./store/useTerminalStore";
 
 /**
  * Open a file launched via an external file association (double-click / "Open
- * with" / single-instance forward). Opens the document in the focused pane and
- * points the sidebar explorer at the file's containing folder so the directory
- * is shown with the current file highlighted.
+ * with" / single-instance forward). Opens the document in the focused pane.
+ *
+ * `switchFolder`：仅冷启动传 true —— 把侧栏目录切到文件所在文件夹；
+ * 运行中再从资源管理器打开新文件时不再自动切换（避免文件目录被永久
+ * 带走），改由标签页右键“打开文件目录”主动切换。
  */
-async function openFileFromAssociation(path: string) {
+async function openFileFromAssociation(path: string, switchFolder: boolean) {
   try {
     // 编码自动检测（UTF-8 / GBK / GB2312 / Big5 / UTF-16），保存时按原编码写回。
     const { content, encoding, hadBom } = await readFileTextWithEncoding(path);
     const name = path.split(/[\\/]/).pop() ?? path;
     openInFocusedPane({ path, name, content, encoding, hadBom });
 
-    // Feature: show the current file's folder in the explorer. Build the tree
-    // for the parent directory; the file itself is highlighted automatically
-    // because FileTree matches node.path against the active tab path.
-    const folder = dirOf(path);
-    try {
-      const tree = await buildTree(folder);
-      useUIStore.getState().setFolder(folder, tree);
-      useConfigStore.getState().update({ lastFolder: folder });
-      // Force the explorer visible for THIS launch only (not persisted) so the
-      // folder is actually displayed — overriding the stored sidebar preference.
-      useUIStore.getState().setSidebarVisible(true);
-    } catch (treeErr) {
-      console.error("Failed to build folder tree for launched file:", treeErr);
+    if (switchFolder) {
+      // 文件树自动高亮当前文件（FileTree 用 node.path 匹配活动 tab path）。
+      await switchFolderRoot(dirOf(path));
     }
   } catch (err) {
     console.error("Failed to open file from association:", err);
   }
+}
+
+/**
+ * 块级快捷键入口（Ctrl+D / Alt+ArrowUp / Alt+ArrowDown）。
+ * 挂在窗口级而非编辑器 keymap：编辑器级绑定只有焦点恰好在可编辑区才
+ * 生效，且部分组合会被 WebView2 / 系统层吞掉；窗口级保证 focus 在
+ * PureMark 内即触发。句柄由各视图注册（见 blockOpsRegistry）：
+ * MarkdownView → TipTap 顶层块；CodeEditor → 空行分隔段落。
+ * 焦点在表单控件（设置面板输入框等）内时放行，避免误操作文档。
+ *
+ * 移动键历史：初版用 Ctrl+PageUp/PageDown，与 Windows 系统导航/选择
+ * 逻辑冲突；现改为 VS Code 风格的 Alt+↑ / Alt+↓，无系统级冲突。
+ */
+function runBlockOps(op: "duplicate" | "up" | "down"): void {
+  const el = document.activeElement;
+  if (
+    el instanceof HTMLInputElement ||
+    el instanceof HTMLTextAreaElement ||
+    el instanceof HTMLSelectElement
+  ) {
+    return;
+  }
+  const handle = getBlockOps(usePanesStore.getState().focusedPaneId);
+  if (!handle) return;
+  if (op === "duplicate") handle.duplicate();
+  else handle.move(op === "up" ? -1 : 1);
 }
 
 /**
@@ -111,7 +133,7 @@ export default function App() {
       // Open the document and point the explorer at its folder. The sidebar is
       // forced visible (session-only, not persisted) so the current file's
       // directory is shown on this launch.
-      await openFileFromAssociation(pending);
+      await openFileFromAssociation(pending, true);
     })();
     return () => {
       cancelled = true;
@@ -150,12 +172,18 @@ export default function App() {
     },
     "Ctrl+N": () => newUntitledInFocusedPane(),
     "Cmd+N": () => newUntitledInFocusedPane(),
+    "Ctrl+`": () => useUIStore.getState().toggleTerminal(),
     "Ctrl+F": () => useUIStore.getState().setSearchOpen(true),
     "Cmd+F": () => useUIStore.getState().setSearchOpen(true),
     // 刷新（需求1）：拦截原生 Ctrl+R / F5，统一走刷新守卫（dev 也不放行）
     "Ctrl+R": () => void guardRefresh(),
     "Cmd+R": () => void guardRefresh(),
     "F5": () => void guardRefresh(),
+    // 块操作：复制当前块到下方 / 上移 / 下移（窗口级，见 runBlockOps）。
+    "Ctrl+D": () => runBlockOps("duplicate"),
+    "Cmd+D": () => runBlockOps("duplicate"),
+    "Alt+ArrowUp": () => runBlockOps("up"),
+    "Alt+ArrowDown": () => runBlockOps("down"),
   });
 
   // 方案 B：启动实时文件监视（外部改动提示条）
@@ -184,18 +212,48 @@ export default function App() {
       } as AddEventListenerOptions);
   }, []);
 
+  // 系统终端：全局注册一次事件监听，把后端输出喂给终端状态库。
+  // 即使终端抽屉被收起（UI 不可见），shell 仍在运行、输出仍在累积，
+  // 重新打开时不会丢历史。面板自身的订阅会在卸载时取消。
+  useEffect(() => {
+    let unData: UnlistenFn | undefined;
+    let unExit: UnlistenFn | undefined;
+    let disposed = false;
+    void (async () => {
+      const d = await onTerminalData((p) =>
+        useTerminalStore.getState().ingest(p.sessionId, p.stream, p.data),
+      );
+      const x = await onTerminalExit((p) =>
+        useTerminalStore.getState().markExited(p.sessionId),
+      );
+      if (disposed) {
+        d();
+        x();
+        return;
+      }
+      unData = d;
+      unExit = x;
+    })();
+    return () => {
+      disposed = true;
+      unData?.();
+      unExit?.();
+    };
+  }, []);
+
   // Runtime file opens: another `.md` double-clicked while the app is already
   // running (single-instance forwards it as `open-file`). Kept in its own
   // effect — the launch-time path is handled by the startup sequence above.
   //
-  // N-06: a runtime open deliberately does NOT collapse the sidebar; only a
-  // cold launch from a file association does.
+  // 运行中打开不再自动切换文件目录（冷启动才切）：避免用户在资源管理器
+  // 里双击别的文件后，侧栏目录被永久带走；需要切换时用标签页右键菜单
+  // 的“打开文件目录”主动触发（见 tabContextMenu）。
   useEffect(() => {
     let unlisten: UnlistenFn | undefined;
     let disposed = false;
     void (async () => {
       const fn = await listen<string>("open-file", (e) => {
-        void openFileFromAssociation(e.payload);
+        void openFileFromAssociation(e.payload, false);
         // Surface the already-running window (double-click a .md while the app
         // is behind another window or minimized). The live instance is the
         // foreground process, so this reliably raises the window on Windows.

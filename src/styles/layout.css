@@ -82,21 +82,18 @@ button {
   background: transparent;
 }
 
-/* Global toggle: hide every scrollbar when the user opts out. */
-.app-shell.hide-scrollbars .file-scroll,
-.app-shell.hide-scrollbars .editor-split,
-.app-shell.hide-scrollbars .cm-editor .cm-scroller,
-.app-shell.hide-scrollbars .pm-live,
-.app-shell.hide-scrollbars .toc-scroll,
-.app-shell.hide-scrollbars .scroll-thin {
+/* Global toggle: hide every scrollbar when the user opts out.
+ * 通配后代而非枚举容器：设置面板（.settings-nav/.settings-body）、
+ * 搜索结果（.search-result-list）、下拉菜单（.select-menu）、代码块横向
+ * 溢出（.pm-editor pre）等滚动区此前都漏掉了；通配后新增容器自动生效。
+ * 滚动能力保留，仅隐藏滚动条 UI（Firefox 用 scrollbar-width，WebView2 用
+ * ::-webkit-scrollbar）。 */
+.app-shell.hide-scrollbars,
+.app-shell.hide-scrollbars * {
   scrollbar-width: none;
 }
-.app-shell.hide-scrollbars .file-scroll::-webkit-scrollbar,
-.app-shell.hide-scrollbars .editor-split::-webkit-scrollbar,
-.app-shell.hide-scrollbars .cm-editor .cm-scroller::-webkit-scrollbar,
-.app-shell.hide-scrollbars .pm-live::-webkit-scrollbar,
-.app-shell.hide-scrollbars .toc-scroll::-webkit-scrollbar,
-.app-shell.hide-scrollbars .scroll-thin::-webkit-scrollbar {
+.app-shell.hide-scrollbars ::-webkit-scrollbar,
+.app-shell.hide-scrollbars::-webkit-scrollbar {
   display: none;
 }
 
@@ -124,6 +121,15 @@ button {
   -webkit-user-select: none;
 }
 
+.header-title {
+  display: block;
+  /* margin-bottom: 10px; */
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  /* text-transform: uppercase; */
+  color: var(--foreground-subtle);
+}
 .app-body {
   flex: 1 1 auto;
   display: flex;
@@ -212,8 +218,9 @@ button {
   background: var(--surface-hover);
   color: var(--foreground);
 }
+/* 选中文件：图标/文字染主题色，背景用亚克力材质（不整块染色） */
 .file-item.active {
-  background: var(--primary-soft);
+  background: var(--acrylic);
   color: var(--primary);
 }
 
@@ -242,8 +249,15 @@ button {
   align-items: flex-end;
   gap: 4px;
   overflow-x: auto;
-  margin-left: 12px;
-  padding-bottom: 6px;
+  margin: 0 12px 4px 12px;
+  border-radius: var(--radius-md);
+
+  /* 隐藏横向滚动条：改用鼠标滚轮水平滚动（TabBar 组件把垂直
+     wheel 转成 scrollLeft，见 TabBar.tsx onWheel）。 */
+  scrollbar-width: none;
+}
+.tab-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-item {
@@ -412,17 +426,10 @@ button {
   user-select: none;
 }
 
-/* Files⇄toc segmented control in the sidebar header. */
-.toc-switch {
-  display: inline-flex;
-  align-items: center;
-}
-
 /* ---- Segmented control (view switcher) ---- */
 /* Apple segmented track: one pill container; the active segment is a floating
  * white pill. Glass seasoning stays on the track, not the segments. */
 .segment-group,
-.toc-switch,
 .theme-segment-group {
   display: inline-flex;
   gap: 2px;
@@ -450,8 +457,9 @@ button {
 .segment:hover {
   color: var(--foreground);
 }
+/* 选中分段：图标染主题色，背景用亚克力材质（取消原白底胶囊） */
 .segment.active {
-  background: var(--surface);
+  background: var(--acrylic);
   color: var(--primary);
   box-shadow: var(--shadow-1);
 }
@@ -514,6 +522,56 @@ button {
     0 0 0 4px var(--ring);
 }
 
+/* 自定义主题色外层：悬停时右上角露出删除角标。 */
+.accent-swatch-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.swatch-remove {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 14px;
+  height: 14px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--surface);
+  background: #ef4444;
+  color: #ffffff;
+  cursor: pointer;
+  z-index: 1;
+}
+.accent-swatch-wrap:hover .swatch-remove {
+  display: inline-flex;
+}
+
+/* “+”新增主题色按钮：虚线空心圆，与预设色板同尺寸。 */
+.accent-swatch.accent-add {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--border-subtle);
+  color: var(--foreground-muted);
+}
+.accent-swatch.accent-add:hover:not(:disabled) {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+.accent-swatch.accent-add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* react-color 取色弹层容器：浮在设置面板之上，圆角 + 阴影。 */
+.accent-picker-popover {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
 /* Icon button primitive */
 .btn-icon {
   display: inline-flex;
@@ -533,8 +591,9 @@ button {
   background: var(--surface-hover);
   color: var(--foreground);
 }
+/* toolbar 按钮激活态：图标染主题色，背景用亚克力材质 */
 .btn-icon.active {
-  background: var(--primary-soft);
+  background: var(--acrylic);
   color: var(--primary);
 }
 
@@ -553,6 +612,31 @@ button {
   opacity: 0.35;
   margin: 0 10px;
   vertical-align: middle;
+}
+
+/* 状态栏「终端」开关按钮 */
+.status-terminal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--foreground-muted);
+  cursor: pointer;
+}
+.status-terminal-btn:hover {
+  background: var(--primary-soft);
+  color: var(--foreground);
+}
+.status-terminal-btn.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary-soft);
 }
 
 /* Status-bar TOC controls: a segmented group (track + floating active pill).
@@ -631,7 +715,6 @@ button {
   padding: 2px 20px 22px;
 }
 .settings-nav {
-  /* 去卡片化：左栏作为轻量导航，不再浮起为卡片 */
   flex: 0 0 22%;            /* 宽度按弹窗宽度百分比，不再写死像素 */
   min-width: 150px;         /* 极窄弹窗时仍保证可读、可用 */
   max-width: 220px;
@@ -687,6 +770,39 @@ button {
   display: block;
   padding: 14px 0;
   border-bottom: 1px solid var(--hairline);
+}
+/* 关于页头部：logo + 名称/简介横向排布 */
+.settings-group.about-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.about-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  flex: 0 0 auto;
+}
+/* 关于页容器：撑满可视高度，供右下角背景水印锚定 */
+.about-page {
+  position: relative;
+  min-height: 100%;
+}
+.about-page > * {
+  position: relative; /* 内容层在水印之上 */
+}
+/* 右下角翻转水印：scaleX(-1) 左右镜像；装饰性元素，不拦截交互 */
+.about-bg {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 110px;
+  height: auto;
+  transform: scaleX(-1);
+  opacity: 0.85;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
 }
 .settings-group:first-child {
   padding-top: 0;
@@ -877,8 +993,9 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-left: auto;
   gap: 8px;
-  width: 100%;
+  /* width: 100%; */
   background: var(--surface);
   border: 1px solid var(--input);
   border-radius: var(--radius-md);

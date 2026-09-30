@@ -9,21 +9,29 @@
  * iter2-ext bumps the schema to 3 (S-14): `accent` / `accentCustom` /
  * `tocVisible` / `tocPosition` / `tocWidth` are backfilled with defaults that
  * reproduce the pre-iter2-ext look exactly, so upgrading users notice nothing.
+ *
+ * schema 4 新增 `customAccents`（用户自定义主题色列表），旧配置回填空数组。
  */
 import { create } from "zustand";
 import type {
   AccentId,
   AppConfig,
+  FileSortOrder,
   ThemePreference,
   TocPosition,
   ViewMode,
   WindowSize,
   WorkspaceLayout,
 } from "../types";
-import { isAccentId } from "../lib/theme";
+import {
+  ACCENT_PRESETS,
+  CUSTOM_ACCENT_SLOTS,
+  isAccentId,
+  normalizeAccentHex,
+} from "../lib/theme";
 import { storeGet, storeSet } from "../lib/tauri";
 
-export const CONFIG_VERSION = 3;
+export const CONFIG_VERSION = 4;
 
 /** Bounds for the outline panel width; mirrors `clamp()` in layout.css (S-12). */
 export const TOC_WIDTH_MIN = 180;
@@ -45,6 +53,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   recentFiles: [],
   accent: "sky",
   accentCustom: null,
+  customAccents: [],
   tocVisible: false,
   tocPosition: "right",
   tocWidth: 220,
@@ -54,6 +63,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   useProseMirrorLive: true,
   useCodeMirrorSource: false,
   showScrollbar: true,
+  fileSortOrder: "name-asc",
+  showExtensionOnRename: false,
 };
 
 /* ------------------------------------------------------------------ *
@@ -120,6 +131,26 @@ function readAccentCustom(v: unknown): string | null {
   return typeof v === "string" && HEX_RE.test(v.trim()) ? v.trim().toLowerCase() : null;
 }
 
+/**
+ * 自定义主题色列表：仅保留合法 hex，归一化小写，去重（含与内置预设
+ * 重复），并截断到剩余槽位（总数 ≤ MAX_ACCENT_COUNT）。
+ */
+function readCustomAccents(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const used = new Set<string>(
+    ACCENT_PRESETS.map((p) => normalizeAccentHex(p.primary) ?? p.primary),
+  );
+  const out: string[] = [];
+  for (const item of v) {
+    if (out.length >= CUSTOM_ACCENT_SLOTS) break;
+    const hex = normalizeAccentHex(item);
+    if (!hex || used.has(hex)) continue;
+    used.add(hex);
+    out.push(hex);
+  }
+  return out;
+}
+
 function readTocPosition(v: unknown): TocPosition {
   return v === "left" || v === "right" ? v : DEFAULT_CONFIG.tocPosition;
 }
@@ -127,6 +158,14 @@ function readTocPosition(v: unknown): TocPosition {
 function readTocWidth(v: unknown): number {
   const n = typeof v === "number" && Number.isFinite(v) ? v : DEFAULT_CONFIG.tocWidth;
   return Math.min(TOC_WIDTH_MAX, Math.max(TOC_WIDTH_MIN, Math.round(n)));
+}
+
+const SORT_ORDERS: FileSortOrder[] = ["name-asc", "name-desc", "type", "modified-desc", "modified-asc"];
+
+function readFileSortOrder(v: unknown): FileSortOrder {
+  return typeof v === "string" && (SORT_ORDERS as string[]).includes(v)
+    ? (v as FileSortOrder)
+    : DEFAULT_CONFIG.fileSortOrder;
 }
 
 function readPaneViewModes(v: unknown, defaultView: ViewMode): [ViewMode, ViewMode] {
@@ -175,6 +214,7 @@ export function migrateConfig(raw: unknown): AppConfig {
         : [],
       accent: readAccent(r.accent),
       accentCustom: readAccentCustom(r.accentCustom),
+      customAccents: readCustomAccents(r.customAccents),
       tocVisible: readBoolean(r.tocVisible, DEFAULT_CONFIG.tocVisible),
       tocPosition: readTocPosition(r.tocPosition),
       tocWidth: readTocWidth(r.tocWidth),
@@ -184,6 +224,8 @@ export function migrateConfig(raw: unknown): AppConfig {
       useProseMirrorLive: readBoolean(r.useProseMirrorLive, DEFAULT_CONFIG.useProseMirrorLive),
       useCodeMirrorSource: readBoolean(r.useCodeMirrorSource, DEFAULT_CONFIG.useCodeMirrorSource),
       showScrollbar: readBoolean(r.showScrollbar, DEFAULT_CONFIG.showScrollbar),
+      fileSortOrder: readFileSortOrder(r.fileSortOrder),
+      showExtensionOnRename: readBoolean(r.showExtensionOnRename, DEFAULT_CONFIG.showExtensionOnRename),
     };
   } catch (err) {
     console.warn("[config] migration failed, falling back to defaults:", err);

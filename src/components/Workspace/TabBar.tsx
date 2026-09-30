@@ -4,8 +4,29 @@ import { useUIStore } from "../../store/useUIStore";
 import { activateTabInFocusedPane } from "../../lib/paneRouter";
 import { requestCloseTab } from "../../lib/closeGuard";
 import { buildTabMenu } from "../../lib/tabContextMenu";
+import { horizontalWheelDelta } from "../../lib/wheelToHorizontal";
 import type { EditorTab } from "../../types";
 import Icon from "../ui/Icon";
+
+// 滚轮横向滚动：垂直滚轮 → scrollLeft（向下→右、向上→左），滚动条已用
+// CSS 隐藏。用回调 ref + 模块级监听器而非 useEffect：
+//   ① React 合成 wheel 在 root 上是 passive 的，preventDefault 无效，
+//     必须原生监听 + passive:false；
+//   ② 不引入 hooks，openFileWiring 测试的 fake 渲染（直接调用组件
+//     函数）不受影响。
+let wheelEl: HTMLDivElement | null = null;
+function onTabBarWheel(e: WheelEvent): void {
+  if (!wheelEl) return;
+  const delta = horizontalWheelDelta(e.deltaX, e.deltaY);
+  if (delta === null) return;
+  e.preventDefault();
+  wheelEl.scrollLeft += delta;
+}
+function attachTabBarWheel(el: HTMLDivElement | null): void {
+  if (wheelEl) wheelEl.removeEventListener("wheel", onTabBarWheel);
+  wheelEl = el;
+  if (el) el.addEventListener("wheel", onTabBarWheel, { passive: false });
+}
 
 /** Multi-tab strip with dirty dots and per-tab close buttons. */
 export default function TabBar() {
@@ -13,7 +34,7 @@ export default function TabBar() {
   const activeId = useTabsStore((s) => s.activeId);
 
   return (
-    <div className="tab-bar">
+    <div className="tab-bar" ref={attachTabBarWheel}>
       {tabs.map((tab) => (
         <div
           key={tab.id}

@@ -1,6 +1,6 @@
 [package]
 name = "puremark"
-version = "0.1.0"
+version = "0.2.0"
 description = "PureMark - a minimal, local-first Markdown editor"
 authors = ["PureMark"]
 edition = "2021"
@@ -15,7 +15,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-store = "2"

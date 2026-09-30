@@ -48,6 +48,9 @@ export type TocPosition = "left" | "right";
 /** Sidebar shape. Session-only state — deliberately NOT persisted. */
 export type SidebarMode = "files" | "toc";
 
+/** 文件树排序方式（持久化到 AppConfig）。 */
+export type FileSortOrder = "name-asc" | "name-desc" | "type" | "modified-desc" | "modified-asc";
+
 /** One heading entry of the document outline. */
 export interface TocItem {
   /** React key / future anchor; slugified `text` with de-duplication. */
@@ -90,6 +93,8 @@ export interface FileNode {
   children?: FileNode[];
   /** Tree depth, used for indentation. */
   depth: number;
+  /** 最后修改时间（毫秒时间戳），由 Rust build_tree 填充。 */
+  mtimeMs?: number;
 }
 
 export interface Cursor {
@@ -185,6 +190,12 @@ export interface AppConfig {
   accent: AccentId;
   /** Custom primary hex for `accent === 'custom'` (P1 / N-20); P0 keeps it null. */
   accentCustom: string | null;
+  /**
+   * 用户新增的自定义主题色列表（归一化小写 hex）。内置预设 + 本列表
+   * 总数 ≤ 10（见 theme.ts `MAX_ACCENT_COUNT`）；选中某项时 `accent`
+   * 置 `'custom'` 且 `accentCustom` 存对应 hex。默认为空。
+   */
+  customAccents: string[];
   /** Outline panel visibility; defaults to `false`. */
   tocVisible: boolean;
   /** Outline panel position; defaults to `'right'`. */
@@ -227,6 +238,19 @@ export interface AppConfig {
    * when false, all in-app scrollbars are hidden via `.app-shell.hide-scrollbars`.
    */
   showScrollbar: boolean;
+
+  /**
+   * 文件树排序方式（侧栏文件目录）。
+   * 默认 `name-asc`（名称 A→Z，目录在前）。
+   */
+  fileSortOrder: FileSortOrder;
+
+  /**
+   * 重命名时是否显示文件扩展名（侧栏文件重命名弹层）。
+   * 默认 false：输入框仅显示文件名主名，扩展名自动保留不变；
+   * 设为 true：显示完整文件名（含扩展名），允许同时修改扩展名（变更时实时提示）。
+   */
+  showExtensionOnRename: boolean;
 }
 
 export type FormatCommand =
@@ -353,4 +377,21 @@ export interface ContextMenuState {
   scope: MenuScope;
   /** 触发源附带的上下文（路径 / 是否目录 / 标签 id）。 */
   payload?: { path?: string; isDir?: boolean; tabId?: string } | null;
+}
+
+/* ---- 重命名弹层 ------------------------------------------------------- */
+
+/** 重命名弹层状态（驱动 <RenamePopover/> 渲染）。 */
+export interface RenameState {
+  /** 弹层标题（如"重命名"、"新建文件"）。 */
+  title: string;
+  /** 输入框默认值（当前文件名）。 */
+  defaultValue: string;
+  /** 提交后执行的回调（传入新名称）。 */
+  onSubmit: (newName: string) => void;
+  /**
+   * 是否允许隐藏扩展名：文件重命名为 `true`，目录 / 新建场景为 `false` 或不传。
+   * 仅当本项为 `true` 且设置 `showExtensionOnRename` 为 `false` 时，输入框才隐藏扩展名。
+   */
+  canHideExtension?: boolean;
 }

@@ -4,6 +4,7 @@ import {
   Minus,
   Square,
   X,
+  Plus,
   FolderOpen,
   PanelLeftClose,
   PanelLeftOpen,
@@ -34,10 +35,14 @@ import {
   Eye,
   Search,
   Settings,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   ArrowUp,
   ArrowDown,
+  ArrowUpDown,
+  ArrowLeft,
+  ArrowRight,
   AlertTriangle,
   Check,
   Palette,
@@ -54,6 +59,9 @@ import {
   FolderPlus,
   Trash2,
   Pencil,
+  Info,
+  FolderTree,
+  Terminal,
 } from "lucide-react";
 
 /**
@@ -115,6 +123,7 @@ export const Icons = {
   Minus,
   Square,
   X,
+  Plus,
   FolderOpen,
   PanelLeftClose,
   PanelLeftOpen,
@@ -145,14 +154,21 @@ export const Icons = {
   Eye,
   Search,
   Settings,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   ArrowUp,
   ArrowDown,
+  ArrowUpDown,
+  ArrowLeft,
+  ArrowRight,
   AlertTriangle,
   Check,
   Palette,
+  // 注册表键 `ListTree` 指向合成图标 ListTreeFramed（toolbar 目录开关专用）；
+  // 原生 lucide ListTree 以 `ListTreeRaw` 键暴露（侧栏切换按钮使用）。
   ListTree: ListTreeFramed,
+  ListTreeRaw: ListTree,
   PanelLeft,
   PanelRight,
   RefreshCw,
@@ -165,6 +181,9 @@ export const Icons = {
   FolderPlus,
   Trash2,
   Pencil,
+  Info,
+  FolderTree,
+  Terminal,
 } as const;
 
 export type IconName = keyof typeof Icons;
