@@ -25,6 +25,8 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { readFileTextWithEncoding } from "./commands/fsCommands";
 import { switchFolderRoot } from "./lib/fileOps";
 import { dirOf } from "./lib/pathUtils";
+import { onTerminalData, onTerminalExit } from "./lib/terminal";
+import { useTerminalStore } from "./store/useTerminalStore";
 
 /**
  * Open a file launched via an external file association (double-click / "Open
@@ -170,6 +172,7 @@ export default function App() {
     },
     "Ctrl+N": () => newUntitledInFocusedPane(),
     "Cmd+N": () => newUntitledInFocusedPane(),
+    "Ctrl+`": () => useUIStore.getState().toggleTerminal(),
     "Ctrl+F": () => useUIStore.getState().setSearchOpen(true),
     "Cmd+F": () => useUIStore.getState().setSearchOpen(true),
     // 刷新（需求1）：拦截原生 Ctrl+R / F5，统一走刷新守卫（dev 也不放行）
@@ -207,6 +210,35 @@ export default function App() {
       window.removeEventListener("contextmenu", onContextMenu, {
         capture: true,
       } as AddEventListenerOptions);
+  }, []);
+
+  // 系统终端：全局注册一次事件监听，把后端输出喂给终端状态库。
+  // 即使终端抽屉被收起（UI 不可见），shell 仍在运行、输出仍在累积，
+  // 重新打开时不会丢历史。面板自身的订阅会在卸载时取消。
+  useEffect(() => {
+    let unData: UnlistenFn | undefined;
+    let unExit: UnlistenFn | undefined;
+    let disposed = false;
+    void (async () => {
+      const d = await onTerminalData((p) =>
+        useTerminalStore.getState().ingest(p.sessionId, p.stream, p.data),
+      );
+      const x = await onTerminalExit((p) =>
+        useTerminalStore.getState().markExited(p.sessionId),
+      );
+      if (disposed) {
+        d();
+        x();
+        return;
+      }
+      unData = d;
+      unExit = x;
+    })();
+    return () => {
+      disposed = true;
+      unData?.();
+      unExit?.();
+    };
   }, []);
 
   // Runtime file opens: another `.md` double-clicked while the app is already

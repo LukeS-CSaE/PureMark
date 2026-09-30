@@ -61,6 +61,7 @@ import {
   Pencil,
   Info,
   FolderTree,
+  Terminal,
 } from "lucide-react";
 
 /**
@@ -182,6 +183,7 @@ export const Icons = {
   Pencil,
   Info,
   FolderTree,
+  Terminal,
 } as const;
 
 export type IconName = keyof typeof Icons;

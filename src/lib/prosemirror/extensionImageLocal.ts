@@ -6,10 +6,19 @@
  * 而节点 `attrs.src` 仍存相对路径（保证序列化回 markdown 仍是相对路径、文件
  * 可移植）。`documentDir` 由 `buildEditorExtensions` 在编辑器构建时按当前文档
  * 目录注入，tab 切换 / 保存后路径变更时重建编辑器即可更新。
+ *
+ * 另补齐两处默认行为缺口：
+ *   - `allowBase64: true`：TipTap Image 默认丢弃 `data:` 图片（parseHTML 的
+ *     `:not([src^="data:"])` 选择器），markdown 里内嵌 base64 图片会被静默吞掉。
+ *   - `storage.markdown.parse.setup`：向 tiptap-markdown 内部的 markdown-it
+ *     注册「宽松图片路径」core 规则（lenientImage.ts），容忍 URL 未编码空格
+ *     （`![a](my img.png)`），与 Typora 行为对齐。按节点名 `image` 与
+ *     tiptap-markdown 内置 spec 合并，serialize 沿用其默认实现。
  */
 import Image, { type ImageOptions } from "@tiptap/extension-image";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { resolveImageSrc } from "./localImage";
+import { registerLenientImageRule } from "./lenientImage";
 
 /** LocalImage 的 options：在 Image 基础上加文档目录，用于解析本地图片。 */
 export interface LocalImageOptions extends ImageOptions {
@@ -24,7 +33,21 @@ export const LocalImage = Image.extend<LocalImageOptions>({
   addOptions() {
     return {
       ...this.parent?.(),
+      // data: 内嵌图片默认被 parseHTML 选择器丢弃，显式放行。
+      allowBase64: true,
       documentDir: "",
+    };
+  },
+  addStorage() {
+    return {
+      markdown: {
+        parse: {
+          // 签名由 tiptap-markdown 约定：setup.call({ editor, options }, mdInstance)。
+          setup(this: unknown, md: unknown): void {
+            registerLenientImageRule(md as Parameters<typeof registerLenientImageRule>[0]);
+          },
+        },
+      },
     };
   },
   renderHTML({ HTMLAttributes }) {

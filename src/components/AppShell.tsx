@@ -9,6 +9,7 @@ import ConflictResolvePage from "./dialogs/ConflictResolvePage";
 import ExternalChangeBar from "./dialogs/ExternalChangeBar";
 import RenamePopover from "./dialogs/RenamePopover";
 import ContextMenu from "./ContextMenu";
+import TerminalPanel from "./Terminal/TerminalPanel";
 import { useUIStore } from "../store/useUIStore";
 import { useConfigStore } from "../store/useConfigStore";
 
@@ -21,6 +22,7 @@ export default function AppShell() {
   const sidebarVisible = useUIStore((s) => s.sidebarVisible);
   const searchOpen = useUIStore((s) => s.searchOpen);
   const configOpen = useUIStore((s) => s.configOpen);
+  const terminalOpen = useUIStore((s) => s.terminalOpen);
   const showScrollbar = useConfigStore((s) => s.config.showScrollbar);
 
   return (
@@ -30,6 +32,7 @@ export default function AppShell() {
         {sidebarVisible && <Sidebar />}
         <Workspace />
       </div>
+      {terminalOpen && <TerminalPanel />}
       <StatusBar />
       {searchOpen && <SearchPanel />}
       {configOpen && <SettingsPanel />}

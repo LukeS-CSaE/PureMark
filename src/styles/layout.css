@@ -614,6 +614,31 @@ button {
   vertical-align: middle;
 }
 
+/* 状态栏「终端」开关按钮 */
+.status-terminal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--foreground-muted);
+  cursor: pointer;
+}
+.status-terminal-btn:hover {
+  background: var(--primary-soft);
+  color: var(--foreground);
+}
+.status-terminal-btn.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary-soft);
+}
+
 /* Status-bar TOC controls: a segmented group (track + floating active pill).
  * The left/right position switch is rendered only while the outline is on,
  * so it appears grouped with the toggle yet stays hidden when TOC is off. */

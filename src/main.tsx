@@ -17,6 +17,8 @@ import "./styles/search.css";
 import "./styles/dialogs.css";
 // 需求2：自定义右键菜单样式
 import "./styles/contextMenu.css";
+// 系统终端抽屉样式
+import "./styles/terminal.css";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

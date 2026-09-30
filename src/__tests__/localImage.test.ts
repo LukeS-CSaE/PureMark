@@ -64,4 +64,45 @@ describe("resolveImageSrc", () => {
     expect(toAsset).toHaveBeenCalledWith("/abs/path/a.png");
     expect(out).toBe("asset:///abs/path/a.png");
   });
+
+  // ── 百分号解码（markdown-it 会把 src 统一 URI 编码后存入 attrs.src）──
+
+  it("相对路径含 %20 空格：先解码再拼接转换", () => {
+    const out = resolveImageSrc("my%20img.png", "C:\\docs", toAsset);
+    expect(toAsset).toHaveBeenCalledWith("C:/docs/my img.png");
+    expect(out).toBe("asset://C:/docs/my img.png");
+  });
+
+  it("相对路径含中文（%E4.. 编码）：解码为原始文件名", () => {
+    const encoded = encodeURIComponent("数据-中文.png");
+    resolveImageSrc(encoded, "C:\\docs", toAsset);
+    expect(toAsset).toHaveBeenCalledWith("C:/docs/数据-中文.png");
+  });
+
+  it("反斜杠相对路径（%5C 编码）：解码并归一化为正斜杠", () => {
+    resolveImageSrc("sub%5Cdir%5Cc.png", "C:\\docs", toAsset);
+    expect(toAsset).toHaveBeenCalledWith("C:/docs/sub/dir/c.png");
+  });
+
+  it("Windows 绝对路径（C:%5C.. 编码形式）：解码后识别为绝对路径，不拼 documentDir", () => {
+    const out = resolveImageSrc("C:%5Cabs%5Cwin.png", "C:\\docs", toAsset);
+    expect(toAsset).toHaveBeenCalledWith("C:/abs/win.png");
+    expect(out).toBe("asset://C:/abs/win.png");
+  });
+
+  it("在线 URL 内含编码字符：原样返回（浏览器自行处理，不本地拼接）", () => {
+    const url = "https://example.com/a%20b.png";
+    expect(resolveImageSrc(url, "/docs", toAsset)).toBe(url);
+    expect(toAsset).not.toHaveBeenCalled();
+  });
+
+  it("非法百分号序列（孤立 %）：解码失败原样走相对路径逻辑", () => {
+    resolveImageSrc("100%.png", "C:\\docs", toAsset);
+    expect(toAsset).toHaveBeenCalledWith("C:/docs/100%.png");
+  });
+
+  it("字面 %25（文件名里真有 % 号）：解码后得到单 % 文件名", () => {
+    resolveImageSrc("50%25%20off.png", "C:\\docs", toAsset);
+    expect(toAsset).toHaveBeenCalledWith("C:/docs/50% off.png");
+  });
 });

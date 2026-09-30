@@ -6,6 +6,8 @@ use tauri::{Emitter, Manager};
 
 use encoding_rs::{Encoding, BIG5, GB18030, UTF_16BE, UTF_16LE, UTF_8};
 
+mod terminal;
+
 /// Mirrors the frontend `FileNode` type. Serialized with camelCase field names
 /// so it can be consumed directly by TypeScript without extra mapping.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -371,6 +373,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(LaunchFile(Mutex::new(initial)))
+        .manage(terminal::TerminalSessions(Mutex::new(std::collections::HashMap::new())))
         .invoke_handler(tauri::generate_handler![
             build_tree,
             take_launch_file,
@@ -381,7 +384,11 @@ pub fn run() {
             write_binary_file,
             reveal_in_explorer,
             read_text_auto,
-            write_text_enc
+            write_text_enc,
+            terminal::terminal_spawn,
+            terminal::terminal_write,
+            terminal::terminal_kill,
+            terminal::terminal_detect_agents
         ])
         .run(tauri::generate_context!())
         .expect("error while running PureMark");

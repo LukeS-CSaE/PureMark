@@ -1,0 +1,201 @@
+/* ===========================================================================
+ * 系统终端抽屉（底部面板）
+ * 终端使用独立深色主题（与编辑器亮/暗主题解耦），符合用户对终端的视觉预期，
+ * 也保证 ANSI 16 色在深色背景上可读。
+ * ========================================================================= */
+
+.terminal-panel {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #1e1e22;
+  color: #e6edf3;
+  border-top: 1px solid var(--acrylic-border-top);
+  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* 顶部拖拽手柄：上拉改变终端高度 */
+.terminal-resize {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: row-resize;
+  z-index: 6;
+}
+.terminal-resize:hover {
+  background: var(--primary-soft);
+}
+
+/* 标签栏 */
+.terminal-tabs {
+  display: flex;
+  align-items: stretch;
+  height: 32px;
+  flex-shrink: 0;
+  background: #18181b;
+  border-bottom: 1px solid #2a2a30;
+  overflow-x: auto;
+}
+.terminal-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 12px;
+  font-size: 12px;
+  color: #9aa4b2;
+  cursor: pointer;
+  white-space: nowrap;
+  border-right: 1px solid #2a2a30;
+}
+.terminal-tab.active {
+  background: #1e1e22;
+  color: #e6edf3;
+  box-shadow: inset 0 -2px 0 var(--primary, #4aa3ff);
+}
+.terminal-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #9aa4b2;
+  cursor: pointer;
+}
+.terminal-tab-close:hover {
+  background: #38383f;
+  color: #fff;
+}
+.terminal-tab-new {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  border: none;
+  background: transparent;
+  color: #9aa4b2;
+  cursor: pointer;
+}
+.terminal-tab-new:hover {
+  background: #2a2a30;
+  color: #fff;
+}
+
+/* 工具栏：智能体快捷启动 + 清空 */
+.terminal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  flex-shrink: 0;
+  padding: 0 10px;
+  background: #1a1a1d;
+  border-bottom: 1px solid #2a2a30;
+  font-size: 12px;
+}
+.terminal-toolbar-label {
+  color: #9aa4b2;
+}
+.terminal-toolbar-hint {
+  color: #6e7681;
+  font-style: italic;
+}
+.terminal-toolbar-spacer {
+  flex: 1 1 auto;
+}
+.terminal-agent-chip {
+  padding: 2px 10px;
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--primary, #4aa3ff);
+  background: color-mix(in srgb, var(--primary, #4aa3ff) 16%, transparent);
+  color: #e6edf3;
+  cursor: pointer;
+  font-family: inherit;
+}
+.terminal-agent-chip:hover {
+  background: color-mix(in srgb, var(--primary, #4aa3ff) 30%, transparent);
+}
+.terminal-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid #2f2f36;
+  background: transparent;
+  color: #c9d1d9;
+  cursor: pointer;
+  font-family: inherit;
+}
+.terminal-toolbar-btn:hover {
+  background: #2a2a30;
+  color: #fff;
+}
+
+/* 输出区 */
+.terminal-output {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.t-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.t-stderr {
+  color: #ff9b95;
+}
+.t-system {
+  color: #6e7681;
+  font-style: italic;
+}
+.t-echo {
+  color: #c9d1d9;
+}
+
+/* 输入行 */
+.terminal-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 6px 12px 8px;
+  border-top: 1px solid #2a2a30;
+  background: #1e1e22;
+}
+.terminal-prompt {
+  color: var(--primary, #4aa3ff);
+  font-weight: 700;
+  user-select: none;
+}
+.terminal-input-field {
+  flex: 1 1 auto;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #e6edf3;
+  font-family: inherit;
+  font-size: 12.5px;
+  caret-color: var(--primary, #4aa3ff);
+}
+.terminal-input-field:disabled {
+  color: #6e7681;
+}
+.terminal-input-field::placeholder {
+  color: #5a6270;
+}
