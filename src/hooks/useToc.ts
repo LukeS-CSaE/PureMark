@@ -10,9 +10,11 @@
  *   • paneId / tabId change -> re-parse IMMEDIATELY so the outline never shows
  *                              a stale document for ~200ms after switching files
  *
- * The live Markdown source is pulled from the pane's `TocAdapter.getMarkdown()`
- * when registered (so a CodeMirror pane reflects uncommitted edits), falling
- * back to the store content otherwise.
+ * The outline is derived from the same reactive tab content the pane renders.
+ * Reading it from the pane's `TocAdapter.getMarkdown()` instead races with tab
+ * switches: the adapter still exposes the previous document when this effect
+ * fires, so the outline stays one document behind. The store content is written
+ * back on every edit, so it is always current.
  */
 import { useEffect, useRef, useState } from "react";
 import type { PaneId, TocItem, TocPosition } from "../types";
@@ -21,7 +23,6 @@ import { useConfigStore } from "../store/useConfigStore";
 import { usePanesStore } from "../store/usePanesStore";
 import { useTabsStore } from "../store/useTabsStore";
 import { parseToc } from "../lib/toc";
-import { getTocAdapter } from "../lib/tocRegistry";
 import { jumpToHeading } from "../lib/tocRouter";
 
 export interface TocState {
@@ -54,11 +55,7 @@ export function useToc(paneId: PaneId): TocState {
   const prevRef = useRef<{ paneId?: PaneId; tabId?: string | null }>({});
 
   useEffect(() => {
-    const compute = () => {
-      const adapter = getTocAdapter(paneId);
-      const md = adapter ? adapter.getMarkdown() : content;
-      setItems(parseToc(md));
-    };
+    const compute = () => setItems(parseToc(content));
 
     const switched =
       prevRef.current.paneId !== paneId || prevRef.current.tabId !== tabId;
